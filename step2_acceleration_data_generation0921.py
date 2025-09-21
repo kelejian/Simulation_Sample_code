@@ -15,9 +15,21 @@ from scipy import signal
 warnings.filterwarnings('ignore')
 
 g=9.81    #单位m/s2
-xls_route = r'I:\000 LX\dataset0715\02_2\results_0911'
+xls_route = r'I:\000 LX\dataset0715\02\results_0918'
+output_path = r'I:\000 LX\dataset0715\03\acc_data_0918'
+params_path = r'I:\000 LX\dataset0715\02\distribution_0919.csv' 
 
-output_path = r'I:\000 LX\dataset0715\03_2\acceleration_data_150ms_0911'
+if params_path.endswith('.npz'):
+    params_npz = np.load(params_path, allow_pickle=True)
+    params_df = pd.DataFrame({
+        key: params_npz[key]
+        for key in params_npz.files
+    }).set_index('case_id')
+elif params_path.endswith('.csv'):
+    params_df = pd.read_csv(params_path)
+    params_df.set_index('case_id', inplace=True)
+
+
 # 如果输出文件夹不存在，则创建
 if not os.path.exists(output_path):
     os.makedirs(output_path)
@@ -99,31 +111,31 @@ bad_case_ids_list = []
 
 for file in path_list:
     case_id = int(file.split('.')[0].split('_')[1])  # 提取case编号
-    # if case_id <= 327:
+    # if case_id <= 11:  # 跳过已经处理过的case
     #     continue
     print(f'Processing case {case_id}...')
     # ------------------------------------------------------------
-    # if delta_v[case_id-1] != 0 or np.isnan(delta_v[case_id-1]):
-    #     print(f"warning: delta_v for case {case_id} is not 0 or NaN, it's{ delta_v[case_id-1]}")
-    # 跳过部分指定case
-    # if case_id in bad_case_ids:
-    #     print(f"Skipping case {case_id} due to known issues.")
-    #     continue
-    # if case_id <= 100:
-    #     continue  # 跳过前100个case
-    # # 如果目标文件夹已经存在对应的CSV文件，则跳过
-    # x_name = 'x' + str(case_id) + '.csv'
-    # y_name = 'y' + str(case_id) + '.csv'
-    # z_name = 'z' + str(case_id) + '.csv'
-    # if all(os.path.exists(os.path.join(output_path, name)) for name in [x_name, y_name, z_name]):
-    #     print(f"Skipping case {case_id} as CSV files already exist.")
-    #     continue
+    impact_velocity = params_df.loc[case_id, 'impact_velocity']  # km/h
+    impact_angle = params_df.loc[case_id, 'impact_angle']  # deg
+    overlap = params_df.loc[case_id, 'overlap']  # -1~1
+    if abs(overlap) < 0.25:
+        print(f"**Warning: Overlap {overlap} out of range in case {case_id}. Skipping this case.")
+        continue
+    if 0.25 <= abs(overlap) < 0.3:
+        # 如果碰撞角度与之同号，跳过该case
+        if impact_angle * overlap > 0:
+            print(f"**Warning: Overlap {overlap} and Impact Angle {impact_angle} have the same sign in case {case_id}. Skipping this case.")
+            continue
+        # 如果碰撞角度绝对值<=30，跳过该case
+        if abs(impact_angle) <= 30:
+            print(f"**Warning: Overlap {overlap} , while Impact Angle {impact_angle} out of range in case {case_id}. Skipping this case.")
+            continue
     # ------------------------------------------------------------
 
     # 先获取文件大小，一般小于9900KB的xlsx文件会含有nan值，加入bad_case_ids_list
     file_size_kb = os.path.getsize(os.path.join(xls_route, file)) / 1024  # 获取文件大小, 单位KB
     #if file_size_kb < 9900: # 200ms 0.01ms则为9900KB
-    if file_size_kb < 13800: # 150ms 0.005ms则为13800KB
+    if file_size_kb < 14000: # 150ms 0.005ms则为14000KB
         print(f"**Warning: {file_size_kb} KB of case {case_id}. Skipping the case.")
         bad_case_ids_list.append(case_id)
         continue
