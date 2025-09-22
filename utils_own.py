@@ -913,5 +913,98 @@ if __name__ == "__main__":
         btf_sample = sampler.sample(speed3, overlap3)
         print(f"  采样 {i+1}: {btf_sample:.2f} ms")
     print("-" * 30)
+# %% 读取指定目录下的acc的xlsx文件，仅将distribution文件中的对应行的have_run值更新为True或保持False，其它不变
+import os
+import pandas as pd
+def update_have_run_status(acc_dir, distribution_path, new_distribution_path):
+    # 读取distribution文件
+    if distribution_path.endswith('.npz'):
+        distribution_npz = np.load(distribution_path, allow_pickle=True)
+        distribution_df = pd.DataFrame({
+                key: distribution_npz[key]
+                for key in distribution_npz.files
+            }).set_index('case_id')
+    elif distribution_path.endswith('.csv'):
+        distribution_df = pd.read_csv(distribution_path)
+        distribution_df.set_index('case_id', inplace=True, drop=False)
+    else:
+        raise ValueError("Unsupported distribution file format. Use .csv or .npz")
+
+    # 遍历acc目录下的所有xlsx文件,形如case_{case_id}.xlsx
+    for filename in os.listdir(acc_dir):
+        if filename.startswith('case_') and filename.endswith('.xlsx'):
+            try:
+                case_id_str = filename.split('_')[1].split('.')[0]
+                case_id = int(case_id_str)
+                if case_id in distribution_df.index:
+                    distribution_df.at[case_id, 'have_run'] = True
+                    print(f"Updated have_run to True for case_id {case_id}")
+                else:
+                    print(f"Warning: case_id {case_id} from file {filename} not found in distribution.")
+            except (IndexError, ValueError) as e:
+                print(f"Error processing file {filename}: {str(e)}")
+
+    # 保存更新后的distribution文件
+    if new_distribution_path.endswith('.npz'):
+        np.savez(new_distribution_path, **{col: distribution_df[col].values for col in distribution_df.columns})
+    elif new_distribution_path.endswith('.csv'):
+        distribution_df.to_csv(new_distribution_path, index=False)
+    else:
+        raise ValueError("Unsupported new distribution file format. Use .csv or .npz")
+
+    print(f"Updated distribution file saved to {new_distribution_path}")
+
+xlsx_results_dir = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\new模型_全宽正碰结果\acc_results'
+distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution_0917.csv'
+new_distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution_0917_updated_have_run.csv'
+
+update_have_run_status(xlsx_results_dir, distribution_path, new_distribution_path)
+
+# %% 读取指定目录下的acc的csv文件，将distribution文件中的对应行的is_pulse_ok值更新为True或False。注意该目录下必须已经是干净的acc文件
+def update_is_pulse_ok_status(acc_dir, distribution_path, new_distribution_path):
+    # 读取distribution文件
+    if distribution_path.endswith('.npz'):
+        distribution_npz = np.load(distribution_path, allow_pickle=True)
+        distribution_df = pd.DataFrame({
+                key: distribution_npz[key]
+                for key in distribution_npz.files
+            }).set_index('case_id')
+    elif distribution_path.endswith('.csv'):
+        distribution_df = pd.read_csv(distribution_path)
+        distribution_df.set_index('case_id', inplace=True, drop=False)
+    else:
+        raise ValueError("Unsupported distribution file format. Use .csv or .npz")
+
+    # 遍历acc目录下的所有x开头的csv文件，形如x{case_id}.csv
+    for filename in os.listdir(acc_dir):
+        if filename.startswith('x') and filename.endswith('.csv'):
+            try:
+                case_id_str = filename.split('x')[1].split('.')[0]
+                case_id = int(case_id_str)
+                if case_id in distribution_df.index:
+                    distribution_df.at[case_id, 'is_pulse_ok'] = False
+                    print(f"Updated is_pulse_ok to False for case_id {case_id}")
+
+                else:
+                    print(f"Warning: case_id {case_id} from file {filename} not found in distribution.")
+            except (IndexError, ValueError) as e:
+                print(f"Error processing file {filename}: {str(e)}")
+
+    # 保存更新后的distribution文件
+    if new_distribution_path.endswith('.npz'):
+        np.savez(new_distribution_path, **{col: distribution_df[col].values for col in distribution_df.columns})
+    elif new_distribution_path.endswith('.csv'):
+        distribution_df.to_csv(new_distribution_path, index=False)
+    else:
+        raise ValueError("Unsupported new distribution file format. Use .csv or .npz")
+
+    print(f"Updated distribution file saved to {new_distribution_path}")
+
+acc_data_dir = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\new模型_全宽正碰结果\acc_results_clean'
+distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution_0917_updated_have_run.csv'
+new_distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution_0917_final.csv'
+
+update_is_pulse_ok_status(acc_data_dir, distribution_path, new_distribution_path)
+
 # %% 
-# %%
+# %% 
