@@ -221,7 +221,7 @@ def sample_collision_params(n_samples=6000, skip_points=1024, method='uniform',
     
     return filename
 
-sample_collision_params(n_samples=3000, skip_points=3000, method='uniform', filename=r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_test1.csv', seed=20252025, case_ids=np.arange(1, 3001))
+sample_collision_params(n_samples=7000, skip_points=5048, method='non_uniform', filename=r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0923_2.csv', seed=20250923, case_ids=np.arange(3001, 3001+7000))
 
 # %% 第二部分：对剩余约束系统参数（包括座椅、乘员体征等参数）进行均匀采样
 import numpy as np

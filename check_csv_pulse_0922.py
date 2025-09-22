@@ -7,9 +7,9 @@ import os
 import warnings
 warnings.filterwarnings('ignore')
 
-x_csv_data_dir = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\acc_data_before0915'
-params_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution_0917.csv'
-save_dir = './异常数据_1221_before0915'
+x_csv_data_dir = r'I:\000 LX\dataset0715\03\acc_data_0918'
+params_path = r'I:\000 LX\dataset0715\03\distribution_0919.csv'
+save_dir = './异常数据_0918'
 # 中文字体设置
 plt.rcParams['font.sans-serif'] = ['SimHei']  # 设置中文字体
 plt.rcParams['axes.unicode_minus'] = False  # 解决负号'-'显示为方块的问题
@@ -131,6 +131,7 @@ for i, x_csv_path in enumerate(x_csv_path_list):
 # 开始遍历检查可能为异常的Ax数据，并将疑似数据画图保存以便人工筛查
 has_nan_case_ids = []
 anormal_case_ids = []
+has_not_runall_case_ids = []
 def check_xyz(range_name, 
               max_threshold_upper=[100.0, 100.0, 100.0, 100.0, 100.0],
               min_threshold_upper=[-60.0, -60.0, -60.0, -60.0, -60.0], 
@@ -152,7 +153,9 @@ def check_xyz(range_name,
     current_min_threshold_lower = min_threshold_lower[range_idx]
     current_ax_avg_threshold = ax_avg_threshold[range_idx]
     current_y_z_abs_max_threshold = y_z_abs_max_threshold[range_idx]
-    
+
+    global has_nan_case_ids, anormal_case_ids, has_not_runall_case_ids
+
     print(f"检查 {range_name} 的XYZ数据：")
     print(f"使用阈值 - max_upper: {current_max_threshold_upper}, min_upper: {current_min_threshold_upper}, min_lower: {current_min_threshold_lower}, ax_avg: {current_ax_avg_threshold}, yz_abs_max: {current_y_z_abs_max_threshold}")
     
@@ -187,7 +190,7 @@ def check_xyz(range_name,
         # 检查NaN值
         if np.isnan(ax_full).any() or np.isnan(ay_full).any() or np.isnan(az_full).any():
             has_nan_case_ids.append(case_id)
-            print(f"Case {case_id} 的数据中包含 NaN 值。")
+            print(f"****!!!Warning: Case {case_id} 的数据中包含 NaN 值。")
             continue
             
         # X方向异常检查
@@ -213,7 +216,7 @@ def check_xyz(range_name,
             'X0附近值比例过大': zero_ratio > zero_nums_ratio_threshold,
             # 'X前半段均值超过阈值': half_avg_front > current_ax_avg_threshold / 2,
             # 'X后半段均值与前半段均值的比值过大': abs(half_avg_ratio) > half_over_ratio_threshold,
-            '150ms附近的值的绝对值的平均值过大': near_150ms_avg > np.abs(ax_min) / 4
+            '150ms附近的值的绝对值的平均值过大': near_150ms_avg > np.abs(ax_min) / 4 # 存在该异常条件的caseid后面要打印出来，视为not_runall
         }
         #x_condition_values = [ax_max, ax_min, ax_avg, zero_ratio, half_avg_front, half_avg_ratio, near_150ms_avg]
         x_condition_values = [ax_max, ax_min, ax_avg, zero_ratio, near_150ms_avg]
@@ -239,6 +242,9 @@ def check_xyz(range_name,
                     print(f" - 条件 {i + 1} 触发: {cond_name}")
                     params['anomaly_conditions'].append(cond_name)
                     params['anomaly_values'].append(all_condition_values[i])
+                    # 如果是150ms附近的值的绝对值的平均值过大，则视为not_runall
+                    if cond_name == '150ms附近的值的绝对值的平均值过大':
+                        has_not_runall_case_ids.append(case_id)
 
             # 画图保存
             save_xyz_acc_plots(time, ax_full, ay_full, az_full, params, 
@@ -251,6 +257,19 @@ def check_xyz(range_name,
     total_cases = len(speed_path_groups[range_name])
     print(f"{range_name} 总共有 {total_cases} 个案例。")
     print(f"可能存在异常的案例累计有 {len(anormal_case_ids)} 个。\n")
+    # not_runall的case_id都打印出来
+    if has_not_runall_case_ids:
+        has_not_runall_case_ids = list(set(has_not_runall_case_ids)) # 去重
+        has_not_runall_case_ids.sort()
+        print(f"以下 {len(has_not_runall_case_ids)} 个案例可能未跑完（150ms附近的值的绝对值的平均值过大）：")
+        print(has_not_runall_case_ids)
+    # nan的case_id都打印出来
+    if has_nan_case_ids:
+        has_nan_case_ids = list(set(has_nan_case_ids)) # 去重
+        has_nan_case_ids.sort()
+        print(f"以下 {len(has_nan_case_ids)} 个案例的数据中包含 NaN 值：")
+        print(has_nan_case_ids)
+
     print("=" * 50)
 
 if __name__ == "__main__":

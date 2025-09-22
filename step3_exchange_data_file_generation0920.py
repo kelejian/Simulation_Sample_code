@@ -11,8 +11,8 @@ import pandas as pd
 
 # --- 1. 全局配置 ---
 
-# .npz参数文件路径
-PARAM_FILE_PATH = r'I:\000 LX\dataset0715\02\distribution_0919.csv'
+# distribution参数文件路径
+PARAM_FILE_PATH = r'I:\000 LX\dataset0715\02\distribution_0923_V2.csv'
 # .var模板文件路径
 BASE_VAR_FILE_PATH = 'basic_variables.var'
 # 碰撞波形CSV文件所在的目录
@@ -78,6 +78,7 @@ def generate_var_files():
         if case_id not in data.index:
             print(f"  - !!警告：工况ID {case_id} 在参数文件中未找到，跳过该工况。")
             continue
+        # 跳过碰撞波形数据有问题的工况(is_pulse_ok=False)
         if data.loc[case_id, 'is_pulse_ok'] == False:
             # print(f"  - !!警告：工况ID {case_id} 的碰撞波形数据有问题，跳过该工况。")
             continue

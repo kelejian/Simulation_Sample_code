@@ -49,12 +49,22 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
     
     print(f"数据包含 {len(data)} 个参数，{len(list(data.values())[0])} 个样本")
     
+    # ******************************************************************************
+    # 考虑排除部分case_id
+    case_id_exclude = pd.read_csv(r'E:\课题组相关\理想项目\仿真数据库相关\distribution\case_ids_to_set_is_pulse_ok_False_0923.csv', header=None).squeeze().tolist()
+    print(f"\n*排除的case_id数量: {len(case_id_exclude)}")
+    data = pd.DataFrame(data)
+    data = data[~np.isin(data['case_id'], case_id_exclude)]
+    data = {col: data[col].values for col in data.columns}
+    print(f"*排除指定case_id后，剩余样本数: {len(data['case_id'])}\n")
+    # ******************************************************************************
+    
     # 定义参数组
     if flag == 'VCS':
         # 碰撞工况参数
         params_to_check = ['impact_velocity', 'impact_angle', 'overlap']
         param_ranges = {
-            'impact_velocity': (25, 65),
+            'impact_velocity': (23, 65),  # 单位km/h, 允许有少量<25km/h的样本
             'impact_angle': (-45, 45),
             'overlap': (-1, 1)  # 特殊区间处理在后面
         }
@@ -454,7 +464,7 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
 
 if __name__ == '__main__':
 
-    verify_and_visualize_params(r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_test.csv', flag='VCS', output_dir='VCS_sample_verification_nonuniform', param_pairs=[('impact_velocity', 'impact_angle'), ('impact_velocity', 'overlap'), ('impact_angle', 'overlap')])
+    verify_and_visualize_params(r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0923_V2.csv', flag='VCS', output_dir='VCS_sample_verification_0923_V2', param_pairs=[('impact_velocity', 'impact_angle'), ('impact_velocity', 'overlap'), ('impact_angle', 'overlap')])
     # verify_and_visualize_params(r'./distribution_full_test.csv', flag='MADYMO', output_dir='MADYMO_sample_verification',
     # param_pairs=[
     #         ('ll1', 'll2'),
@@ -1122,63 +1132,56 @@ if __name__ == '__main__':
         output_csv='distribution_VCSonly_with_symmetrical.csv'
     )
 
-# %% 把之前的旧的distribution.npz中已跑过的case填进新的distribution.csv中
+# %% 把之前的旧的distribution.csv中is_pulse_ok为true的case的行替换进新的distribution.csv中
 import numpy as np
 import pandas as pd
 import os
 
-# old_distribution_file = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution_0825_final.npz'
-old_distribution_file = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution_NEW600.npz'
+old_distribution_file = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0922.csv'
 
-new_distribution_file = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\代码\distribution_0917_2.csv'
+new_distribution_file = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0923_V0.csv'
 
-# 旧的结果文件夹
-# results_folder = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\acc_data_200ms_0906_clear'
-# results_folder = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\acc_data_150ms_0911_clear'
-results_folder = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\acc_data_150ms_0914_NEW600_clear'
+# 读取文件
+old_csv = pd.read_csv(old_distribution_file).set_index('case_id', drop=False)
+new_df = pd.read_csv(new_distribution_file).set_index('case_id', drop=False)
 
+# 旧的distribution中is_pulse_ok为true的case
+old_df_filtered = old_csv[old_csv['is_pulse_ok'] == True]
 
-old_distribution_data = np.load(old_distribution_file, allow_pickle=True)
+print(f"旧文件总行数: {len(old_csv)}")
+print(f"新文件总行数: {len(new_df)}")
+print(f"旧文件中is_pulse_ok为true的行数: {len(old_df_filtered)}")
 
-# 转为df，保持列名；并以case_id为索引
-old_df = pd.DataFrame({key: old_distribution_data[key] for key in old_distribution_data.files})
-# old_df.set_index('case_id', inplace=True)
-# NEW600没有case_id列，需要自己生成1801~2400
-old_df.set_index(pd.RangeIndex(start=1801, stop=2401), inplace=True)
-# print(old_df.iloc[0])
+# 检查列名是否完全匹配
+old_cols = set(old_df_filtered.columns)
+new_cols = set(new_df.columns)
+if old_cols != new_cols:
+    print("警告: 两个文件的列名不完全匹配!")
+    print(f"旧文件多出的列: {old_cols - new_cols}")
+    print(f"新文件多出的列: {new_cols - old_cols}")
+    raise ValueError("列名不匹配，无法继续替换操作。")
+else:
+    print("列名匹配，继续检查索引是否对其顺序。")
+# 检查索引对齐
+for col1, col2 in zip(old_df_filtered.columns, new_df.columns):
+    if col1 != col2:
+        print(f"警告: 列名顺序不匹配! 旧文件列: {col1}, 新文件列: {col2}")
+        raise ValueError("列名顺序不匹配，无法继续替换操作。")
+print("列名顺序匹配，继续替换操作。")
 
-# 第一行为列名
-new_df = pd.read_csv(new_distribution_file)
-
-case_ids_fill = []
-if not os.path.exists(results_folder):
-    print(f"目录 {results_folder} 不存在，请检查路径。")
-for root, dirs, files in os.walk(results_folder):
-    for file in files:
-        if file.startswith('x') and file.endswith('.csv'):
-            case_id = int(file.split('.')[0][1:])
-            case_ids_fill.append(case_id)
-case_ids_fill = sorted(case_ids_fill)
-print(f"在{results_folder}找到 {len(case_ids_fill)} 个x csv文件。")
-
-for case_id in case_ids_fill:
-    if case_id in old_df.index:
-        print(f"正在处理 case_id={case_id} ...")
-        old_row = old_df.loc[case_id].to_dict()
-        # for key in old_row:
-        #     if key in new_df.columns: # 如果新的distribution中有这个参数
-        #         new_df.loc[new_df['case_id'] == case_id, key] = old_row[key]
-        new_df.loc[new_df['case_id'] == case_id, 'impact_velocity'] = old_row['impact_velocity']
-        new_df.loc[new_df['case_id'] == case_id, 'impact_angle'] = old_row['impact_angle']
-        new_df.loc[new_df['case_id'] == case_id, 'overlap'] = old_row['overlap']
-        print(f"  - case_id={case_id} 的数据已填入新的distribution中。")
-        new_df.loc[new_df['case_id'] == case_id, 'have_run'] = True
-        new_df.loc[new_df['case_id'] == case_id, 'is_pulse_ok'] = True
+# 遍历旧的distribution中is_pulse_ok为true的case，将其行替换进新的distribution中
+replace_count = 0
+for case_id, row in old_df_filtered.iterrows():
+    if case_id in new_df.index:
+        new_df.loc[case_id] = row
+        replace_count += 1
     else:
-        print(f"  - 警告: case_id={case_id} 在旧的distribution中未找到，跳过。")
+        print(f"警告: case_id {case_id} 在新的distribution中未找到，无法替换。")
+
+print(f"总共替换了 {replace_count} 行")
 
 # 保存新的distribution.csv
-new_name = './distribution_0917_3.csv'
+new_name = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0923.csv'
 new_df.to_csv(new_name, index=False)
 # %% 对比两个csv文件内容的差异
 import pandas as pd
@@ -1227,8 +1230,151 @@ else:
 
 
 
-# %%
-# %%
+# %% 读取指定目录下的acc的xlsx文件，仅将distribution文件中的对应行的have_run值更新为True或保持False，其它不变
+import os
+import pandas as pd
+def update_have_run_status(acc_dir, distribution_path, new_distribution_path):
+    # 读取distribution文件
+    if distribution_path.endswith('.npz'):
+        distribution_npz = np.load(distribution_path, allow_pickle=True)
+        distribution_df = pd.DataFrame({
+                key: distribution_npz[key]
+                for key in distribution_npz.files
+            }).set_index('case_id')
+    elif distribution_path.endswith('.csv'):
+        distribution_df = pd.read_csv(distribution_path)
+        distribution_df.set_index('case_id', inplace=True, drop=False)
+    else:
+        raise ValueError("Unsupported distribution file format. Use .csv or .npz")
+
+    # 遍历acc目录下的所有xlsx文件,形如case_{case_id}.xlsx
+    change_count = 0
+    for filename in os.listdir(acc_dir):
+        if filename.startswith('case_') and filename.endswith('.xlsx'):
+            try:
+                case_id_str = filename.split('_')[1].split('.')[0]
+                case_id = int(case_id_str)
+                if case_id in distribution_df.index:
+                    distribution_df.at[case_id, 'have_run'] = True
+                    print(f"Updated have_run to True for case_id {case_id}")
+                    change_count += 1
+                else:
+                    print(f"Warning: case_id {case_id} from file {filename} not found in distribution.")
+            except (IndexError, ValueError) as e:
+                print(f"Error processing file {filename}: {str(e)}")
+
+    # 保存更新后的distribution文件
+    if new_distribution_path.endswith('.npz'):
+        np.savez(new_distribution_path, **{col: distribution_df[col].values for col in distribution_df.columns})
+    elif new_distribution_path.endswith('.csv'):
+        distribution_df.to_csv(new_distribution_path, index=False)
+    else:
+        raise ValueError("Unsupported new distribution file format. Use .csv or .npz")
+
+    print(f"Total cases updated with have_run=True: {change_count}")
+    print(f"Updated distribution file saved to {new_distribution_path}")
+
+xlsx_results_dir = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\new模型_全宽正碰结果\acc_results'
+distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution_0917.csv'
+new_distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution_0917_updated_have_run.csv'
+
+update_have_run_status(xlsx_results_dir, distribution_path, new_distribution_path)
+
+# %% 读取指定目录下的acc的csv文件，将distribution文件中的对应行的is_pulse_ok值更新为True或False。注意该目录下必须已经是干净的acc文件
+import os
+import pandas as pd
+def update_is_pulse_ok_status(acc_dir, distribution_path, new_distribution_path):
+    # 读取distribution文件
+    if distribution_path.endswith('.npz'):
+        distribution_npz = np.load(distribution_path, allow_pickle=True)
+        distribution_df = pd.DataFrame({
+                key: distribution_npz[key]
+                for key in distribution_npz.files
+            }).set_index('case_id', drop=False)
+    elif distribution_path.endswith('.csv'):
+        distribution_df = pd.read_csv(distribution_path)
+        distribution_df.set_index('case_id', inplace=True, drop=False)
+    else:
+        raise ValueError("Unsupported distribution file format. Use .csv or .npz")
+
+    # 遍历acc目录下的所有x开头的csv文件，形如x{case_id}.csv
+    change_count = 0
+    for filename in os.listdir(acc_dir):
+        if filename.startswith('x') and filename.endswith('.csv'):
+            try:
+                case_id_str = filename.split('x')[1].split('.')[0]
+                case_id = int(case_id_str)
+                if case_id in distribution_df.index:
+                    distribution_df.at[case_id, 'have_run'] = True
+                    distribution_df.at[case_id, 'is_pulse_ok'] = True
+                    print(f"Updated is_pulse_ok to True for case_id {case_id}")
+                    change_count += 1
+                else:
+                    print(f"Warning: case_id {case_id} from file {filename} not found in distribution.")
+            except (IndexError, ValueError) as e:
+                print(f"Error processing file {filename}: {str(e)}")
+
+    # 保存更新后的distribution文件
+    if new_distribution_path.endswith('.npz'):
+        np.savez(new_distribution_path, **{col: distribution_df[col].values for col in distribution_df.columns})
+    elif new_distribution_path.endswith('.csv'):
+        distribution_df.to_csv(new_distribution_path, index=False)
+    else:
+        raise ValueError("Unsupported new distribution file format. Use .csv or .npz")
+    
+    print(f"Total cases updated with is_pulse_ok=True: {change_count}")
+    print(f"Updated distribution file saved to {new_distribution_path}")
+
+acc_data_dir = r'I:\000 LX\dataset0715\03\acc_data_0918_470'
+distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution_0917_updated_have_run.csv'
+new_distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution_0917_final.csv'
+
+update_is_pulse_ok_status(acc_data_dir, distribution_path, new_distribution_path)
+# %% 额外将部分case的is_pulse_ok改为False。这部分case的csv文件暂时保留
+import os
+import pandas as pd
+import numpy as np
+
+distribution_path = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0923_V1.csv'
+
+# 读取distribution文件
+if distribution_path.endswith('.npz'):
+    distribution_npz = np.load(distribution_path, allow_pickle=True)
+    distribution_df = pd.DataFrame({
+            key: distribution_npz[key]
+            for key in distribution_npz.files
+        }).set_index('case_id', drop=False)
+elif distribution_path.endswith('.csv'):
+    distribution_df = pd.read_csv(distribution_path)
+    distribution_df.set_index('case_id', inplace=True, drop=False)
+else:
+    raise ValueError("Unsupported distribution file format. Use .csv or .npz")
+
+# 重叠率绝对值小于0.25的case的is_pulse_ok改为False
+# 重叠率绝对值在0.25~0.3之间的case中：碰撞角度是否与重叠率异号，且碰撞角度绝对值>=30度满足条件，其is_pulse_ok保持True，否则改为False
+mask1 = (abs(distribution_df['overlap']) < 0.25)
+mask2 = (abs(distribution_df['overlap']) >= 0.25) & (abs(distribution_df['overlap']) < 0.3) & ((abs(distribution_df['impact_angle']) < 30) | (np.sign(distribution_df['impact_angle']) == np.sign(distribution_df['overlap'])))
+old_df_filtered = distribution_df[mask1 | mask2]
+print(f"不符合条件的行数: {len(old_df_filtered)}")
+print(old_df_filtered[['case_id', 'impact_angle', 'overlap', 'is_pulse_ok']])
+
+case_ids_to_update = old_df_filtered['case_id'].tolist()
+for case_id in case_ids_to_update:
+    distribution_df.at[case_id, 'is_pulse_ok'] = False
+    print(f"Updated is_pulse_ok to False for case_id {case_id}.")
+# 将case_ids_to_update保存为csv文件
+case_ids_df = pd.DataFrame(case_ids_to_update)
+case_ids_df.to_csv(r'E:\课题组相关\理想项目\仿真数据库相关\distribution\case_ids_to_set_is_pulse_ok_False_0923.csv', index=False, header=None)
+print("case_ids_to_update已保存为CSV文件。")
+
+# # 保存更新后的distribution文件
+# new_distribution_path = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0923_V2.csv'
+# if new_distribution_path.endswith('.npz'):
+#     np.savez(new_distribution_path, **{col: distribution_df[col].values for col in distribution_df.columns})
+# elif new_distribution_path.endswith('.csv'):
+#     distribution_df.to_csv(new_distribution_path, index=False)
+
+
 # %%
 # %%
 # %%
