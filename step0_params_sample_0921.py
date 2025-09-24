@@ -533,19 +533,20 @@ def sample_restraint_params(filename, new_filename,  case_ids, n_samples=None, s
 
     return new_filename
 
-distribution_file = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0917.csv'
-new_filename = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0919.csv'
+distribution_file = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0923_V2.csv'
+new_filename = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0924.csv'
 
 # 读取distribution_file中，is_pulse_ok为TRUE、且'occupant_type'还没有值的的case_id列，转为list，这部分作为填充的case_ids;
 if distribution_file.endswith('.csv'):
     df = pd.read_csv(distribution_file)
-    case_ids_to_fill = df[df['is_pulse_ok'] == True & df['occupant_type'].isnull()]['case_id'].tolist()
+    case_ids_to_fill = df[(df['is_pulse_ok'] == True) & (df['occupant_type'].isnull())]['case_id'].tolist()
 if distribution_file.endswith('.npz'):
     with np.load(distribution_file) as data:
         df = pd.DataFrame({key: data[key] for key in data.files})
-        case_ids_to_fill = df[df['is_pulse_ok'] == True & df['occupant_type'].isnull()]['case_id'].tolist()
+        case_ids_to_fill = df[(df['is_pulse_ok'] == True) & (df['occupant_type'].isnull())]['case_id'].tolist()
 
 print(f"需要填充约束系统参数的case_id数量: {len(case_ids_to_fill)}")
 print(f"部分case_id示例（开头和结尾）: {case_ids_to_fill[:10]} ... {case_ids_to_fill[-10:]}")
 
-sample_restraint_params(filename=distribution_file, new_filename=new_filename, case_ids=case_ids_to_fill, skip_points=18000, seed=20252025)
+sample_restraint_params(filename=distribution_file, new_filename=new_filename, case_ids=case_ids_to_fill, skip_points=20000, seed=20250924)
+# %%
