@@ -182,11 +182,12 @@ def sample_collision_params(n_samples=6000, skip_points=1024, method='uniform',
         'overlap': overlap,
     }
     
-    # 添加nan值占位约束系统参数
+    # 添加nan值占位约束系统参数和损伤值标签
     param_names = [
         'occupant_type', 'll1', 'll2', 'btf', 'pp', 'plp',
         'lla_status', 'llattf', 'dz', 'ptf', 'aft', 'aav_status',
-        'ttf', 'sp', 'recline_angle'
+        'ttf', 'sp', 'recline_angle',
+        'HIC15', 'Dmax', 'Nij'
     ]
     
     for param in param_names:
