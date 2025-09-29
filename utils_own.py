@@ -82,16 +82,16 @@ def plot_acceleration_waveforms(case_ids, save_plots=False, show_plots=True, dat
             
             # ********************************************************************
             # 只选择time = 2ms,4ms,....150ms的数据点进行绘图;
-            time_need = np.round(np.arange(0.001, 0.151, 0.001), 8) # 需要的时间点，单位秒
-            x_data['time_rounded'] = np.round(x_data['time'], 8)
-            time_mask = x_data['time_rounded'].isin(time_need)
-            x_data = x_data[time_mask]
-            y_data = y_data[time_mask]
-            z_data = z_data[time_mask] 
-            # print(len(x_data), len(y_data), len(z_data))
-            if len(time_need) != len(x_data) or len(time_need) != len(y_data) or len(time_need) != len(z_data):
-                print(f"***Warning: Case {case_id} does not have the required time points. Skipping...")
-            # ********************************************************************
+            # time_need = np.round(np.arange(0.001, 0.151, 0.001), 8) # 需要的时间点，单位秒
+            # x_data['time_rounded'] = np.round(x_data['time'], 8)
+            # time_mask = x_data['time_rounded'].isin(time_need)
+            # x_data = x_data[time_mask]
+            # y_data = y_data[time_mask]
+            # z_data = z_data[time_mask] 
+            # # print(len(x_data), len(y_data), len(z_data))
+            # if len(time_need) != len(x_data) or len(time_need) != len(y_data) or len(time_need) != len(z_data):
+            #     print(f"***Warning: Case {case_id} does not have the required time points. Skipping...")
+            # # ********************************************************************
 
             # X方向加速度
             axes[0].plot(x_data['time'] * 1000, x_data['ax'], 'b-', linewidth=1.5, label='X-direction')
@@ -141,7 +141,7 @@ def plot_acceleration_waveforms(case_ids, save_plots=False, show_plots=True, dat
 
 
 # 加载工况参数
-case_params_path = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0917.csv'
+case_params_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0928_V3.csv'
 if not os.path.exists(case_params_path):
     print(f"Error: Case parameters file not found at {case_params_path}")
     exit()
@@ -155,10 +155,12 @@ with open(case_params_path, 'r') as f:
             key: all_case_params[key]
             for key in all_case_params.files
         }).set_index('case_id')
+# 只选取is_pulse_ok == True的case
+params_df = params_df[params_df['is_pulse_ok'] == True]
 
-example_case_ids = list(np.arange(1, 10))  # 示例 case_id 列表
-data_dir = r'E:\课题组相关\理想项目\仿真数据库相关\acc_data_before0915'
-save_dir = r'E:\课题组相关\理想项目\仿真数据库相关\acc_data_before0915\acceleration_plots'
+example_case_ids = list(np.random.choice(np.arange(1, 1001), size=20, replace=False))  # 示例 case_id 列表
+data_dir = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\acc_data_before0924'
+save_dir = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\acc_data_before0924\acceleration_plots'
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 plot_acceleration_waveforms(example_case_ids, save_plots=True, show_plots=False, data_dir=data_dir, params_df=params_df, save_dir=save_dir)
