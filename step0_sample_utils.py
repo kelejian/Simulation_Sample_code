@@ -1177,9 +1177,9 @@ elif new_distribution_path.endswith('.csv'):
 # %% 将头颈胸损伤标签（HIC15, Dmax, Nij）添加到distribution文件中
 import numpy as np
 import pandas as pd
-distribution_path = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0928_V3.csv'
-new_distribution_path = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0928_V4.csv'
-Injury_labels_path = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\injury_labels_0926new.xlsx'
+distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0928_V3.csv'
+new_distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0929.csv'
+Injury_labels_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\injury_labels_0929.xlsx'
 # 读取distribution文件
 if distribution_path.endswith('.npz'):
     distribution_npz = np.load(distribution_path, allow_pickle=True)
@@ -1219,11 +1219,11 @@ for case_id, row in injury_df.iterrows():
     else:
         print(f"Warning: case_id {case_id} from injury_labels not found in distribution.")
 print(f"Total cases updated with injury labels: {update_count}")
-# injury_df的OK列为False的case，其distribution_df中的is_injury_ok改为False
+# injury_df的Valid列为False的case，其distribution_df中的is_injury_ok改为False
 False_count = 0
 for case_id, row in injury_df.iterrows():
     if case_id in distribution_df.index:
-        if row['OK'] == False:
+        if row['Valid'] == False:
             distribution_df.at[case_id, 'is_injury_ok'] = False
             False_count += 1
     else:
@@ -1236,7 +1236,81 @@ elif new_distribution_path.endswith('.csv'):
     distribution_df.to_csv(new_distribution_path, index=False)
     print("Updated distribution file with injury labels has been saved.")
     
-# %%
+# %% 为distribution文件计算delta-v。如果没有该列，则添加该列，初始值为NaN
+import numpy as np
+import pandas as pd
+from scipy import integrate
+distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0929.csv'
+new_distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0929_V2.csv'
+acc_csv_dir = r'F:\VCS_acc_data\acc_data_before0928_2375'
+
+# 读取distribution文件
+if distribution_path.endswith('.npz'):
+    distribution_npz = np.load(distribution_path, allow_pickle=True)
+    distribution_df = pd.DataFrame({
+            key: distribution_npz[key]
+            for key in distribution_npz.files
+        }).set_index('case_id', drop=False)
+elif distribution_path.endswith('.csv'):
+    distribution_df = pd.read_csv(distribution_path)
+    distribution_df.set_index('case_id', inplace=True, drop=False)
+else:
+    raise ValueError("Unsupported distribution file format. Use .csv or .npz")
+# 如果distribution_df中没有delta_vx或delta_vy或delta_v列，先在DataFrame中添加该列，初始值为NaN
+if 'delta_vx(kph)' not in distribution_df.columns:
+    distribution_df['delta_vx(kph)'] = np.nan
+    print("Added missing column 'delta_vx(kph)' to distribution DataFrame.")
+if 'delta_vy(kph)' not in distribution_df.columns:
+    distribution_df['delta_vy(kph)'] = np.nan
+    print("Added missing column 'delta_vy(kph)' to distribution DataFrame.")
+if 'delta_v(kph)' not in distribution_df.columns:
+    distribution_df['delta_v(kph)'] = np.nan
+    print("Added missing column 'delta_v(kph)' to distribution DataFrame.")
+# 遍历acc_csv_dir目录下的所有x开头的csv文件，形如x{case_id}.csv
+# 对应的y文件形如y{case_id}.csv
+case_ids = []
+if not os.path.isdir(acc_csv_dir):
+    raise FileNotFoundError(f"Directory not found: {acc_csv_dir}")
+for file in os.listdir(acc_csv_dir):
+    if file.startswith('x') and file.endswith('.csv'):
+        try:
+            case_id = int(file.split('.')[0][1:])
+            case_ids.append(case_id)
+        except (ValueError, IndexError):
+            print(f"Warning: Could not parse case_id from filename '{file}'. Skipping.")
+case_ids.sort()
+print(f"Found {len(case_ids)} case_ids in acc directory.")
+
+cal_success_count = 0
+for case_id in case_ids:
+    x_file = os.path.join(acc_csv_dir, f'x{case_id}.csv')
+    y_file = os.path.join(acc_csv_dir, f'y{case_id}.csv')
+    # 检查文件是否存在
+    if not os.path.exists(y_file):
+        print(f"Warning: Missing y file for case_id {case_id}. Skipping.")
+        continue
+    x_data = pd.read_csv(x_file, sep='\t', header=None, names=['time', 'ax']) # s和m/s²
+    y_data = pd.read_csv(y_file, sep='\t', header=None, names=['time', 'ay'])
+    # 计算delta_v：根据x{case_id}.csv文件积分得到delta_vx，再根据y{case_id}.csv文件积分得到delta_vy，最后计算delta_v=sqrt(delta_vx^2+delta_vy^2)
+    # 使用 .to_numpy() 转换成numpy数组，效率更高
+    delta_vx = integrate.simpson(y=x_data['ax'].to_numpy(), x=x_data['time'].to_numpy())
+    delta_vy = integrate.simpson(y=y_data['ay'].to_numpy(), x=y_data['time'].to_numpy())
+    delta_v = np.sqrt(delta_vx**2 + delta_vy**2)
+    if case_id in distribution_df.index:
+        distribution_df.at[case_id, 'delta_vx(kph)'] = delta_vx * 3.6  # m/s转换为kph
+        distribution_df.at[case_id, 'delta_vy(kph)'] = delta_vy * 3.6  # m/s转换为kph
+        distribution_df.at[case_id, 'delta_v(kph)'] = delta_v * 3.6  # m/s转换为kph
+        cal_success_count += 1
+        # print(f"Calculated delta_v for case_id {case_id}: delta_vx={delta_vx:.2f}, delta_vy={delta_vy:.2f}, delta_v={delta_v:.2f}")
+    else:
+        print(f"Warning: case_id {case_id} from acc files not found in distribution.")
+print(f"Total cases with delta_v calculated: {cal_success_count}")
+# 保存更新后的distribution文件
+if new_distribution_path.endswith('.npz'):
+    np.savez(new_distribution_path, **{col: distribution_df[col].values for col in distribution_df.columns})
+elif new_distribution_path.endswith('.csv'):
+    distribution_df.to_csv(new_distribution_path, index=False)
+    print("Updated distribution file with delta_v has been saved.")
 # %% 
 # %% 
 # %% 
