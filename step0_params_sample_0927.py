@@ -534,8 +534,8 @@ def sample_restraint_params(filename, new_filename,  case_ids, n_samples=None, s
 
     return new_filename
 
-distribution_file = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0923_V2.csv'
-new_filename = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0924.csv'
+distribution_file = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0929_V2.csv'
+new_filename = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1001.csv'
 
 # 读取distribution_file中，is_pulse_ok为TRUE、且'occupant_type'还没有值的的case_id列，转为list，这部分作为填充的case_ids;
 if distribution_file.endswith('.csv'):
@@ -549,5 +549,5 @@ if distribution_file.endswith('.npz'):
 print(f"需要填充约束系统参数的case_id数量: {len(case_ids_to_fill)}")
 print(f"部分case_id示例（开头和结尾）: {case_ids_to_fill[:10]} ... {case_ids_to_fill[-10:]}")
 
-sample_restraint_params(filename=distribution_file, new_filename=new_filename, case_ids=case_ids_to_fill, skip_points=20000, seed=20250924)
+sample_restraint_params(filename=distribution_file, new_filename=new_filename, case_ids=case_ids_to_fill, skip_points=23000, seed=20251001)
 # %%
