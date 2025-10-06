@@ -1278,7 +1278,7 @@ params_add = {
     'have_run': [True, True, True, True],
     'impact_velocity': [30.0, 40.0, 50.0, 60.48],
     'impact_angle': [0,0,0,0],
-    'overlap': [0,0,0,0],
+    'overlap': [1.0,1.0,1.0,1.0],
 }
 # 创建DataFrame
 df_add = pd.DataFrame(params_add).set_index('case_id', drop=False)
