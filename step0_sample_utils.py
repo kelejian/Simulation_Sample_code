@@ -746,62 +746,6 @@ for key, value in random_results.items():
 
 
 
-# %% 额外在最开始增加若干组对称case
-# 比如: 速度为v,角度为a>0,重叠率为o<0。则其对称case: 速度为v,角度为a-90°,重叠率为o+1；当速度为v,角度为a<0,重叠率为o>0时，其对称case: 速度为v,角度为a+90°,重叠率为o-1。如此构造若干组对称case，速度和重叠率范围同前，但角度绝对值范围为30°~60°。
-import numpy as np
-import pandas as pd
-distributions = np.load('distribution_VCSonly.npz', allow_pickle=True)
-# 生成对称case
-symmetrical_cases = []
-for i in range(100):
-    v = np.random.uniform(30, 45)
-    a = np.random.uniform(30, 60) * np.sign(np.random.randn())
-    o = np.random.uniform(0.02, 0.98) * np.sign(-a) # 角度为正时重叠率为负，角度为负时重叠率为正
-    is_bad = None
-    case_id = 6000 + i*2 + 1
-    symmetrical_cases.append((v, a, o, case_id, is_bad))  # 注意顺序：case_id在is_bad之前
-    if a > 0:
-        symmetrical_cases.append((v, a - 90, o + 1, case_id+1, is_bad))
-    else:
-        symmetrical_cases.append((v, a + 90, o - 1, case_id+1, is_bad))
-
-# 将生成的对称case添加到主数据集的末尾
-symmetrical_df = pd.DataFrame(symmetrical_cases, columns=['impact_velocity', 'impact_angle', 'overlap', 'case_id', 'is_bad'])
-print("对称cases:")
-print(symmetrical_df)
-
-# 正确创建原始数据的DataFrame，确保列名顺序一致
-original_df = pd.DataFrame({
-    'impact_velocity': distributions['impact_velocity'],
-    'impact_angle': distributions['impact_angle'], 
-    'overlap': distributions['overlap'],
-    'case_id': distributions['case_id'],
-    'is_bad': distributions['is_bad']
-})
-
-# 合并数据
-df = pd.concat([original_df, symmetrical_df], ignore_index=True)
-
-# 打印caseid大于6000的前10行
-print("\ncase_id > 6000的前10行:")
-print(df[df['case_id'] > 6000].head(10))
-
-# 保存
-output_filename = 'distribution_VCSonly_with_symmetrical.npz'
-print(f"正在将所有样本打包保存到 {output_filename} ...")
-
-# 使用 np.savez_compressed 来创建一个压缩的 .npz 文件
-# 文件中的每个数组都以关键字参数命名
-np.savez_compressed(
-    output_filename,
-    impact_velocity=df['impact_velocity'].to_numpy(),
-    impact_angle=df['impact_angle'].to_numpy(),
-    overlap=df['overlap'].to_numpy(),
-    case_id=df['case_id'].to_numpy(),
-    is_bad=df['is_bad'].to_numpy(dtype=object) # 指定dtype=object以正确保存None值
-)
-
-print(f"文件 '{output_filename}' 保存成功。")
 
 
 # %% distribution.npz转换为表格，包含中文参数名
@@ -1311,8 +1255,42 @@ if new_distribution_path.endswith('.npz'):
 elif new_distribution_path.endswith('.csv'):
     distribution_df.to_csv(new_distribution_path, index=False)
     print("Updated distribution file with delta_v has been saved.")
-# %% 
-# %% 
-# %% 
-# %% 
-# %% 
+# %% 为ditribution文件添加几个手动指定的case
+import numpy as np
+import pandas as pd
+distribution_path = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1001.csv'
+new_distribution_path = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1006.csv'
+# 读取distribution文件
+if distribution_path.endswith('.npz'):
+    distribution_npz = np.load(distribution_path, allow_pickle=True)
+    distribution_df = pd.DataFrame({
+            key: distribution_npz[key]
+            for key in distribution_npz.files
+        }).set_index('case_id', drop=False)
+elif distribution_path.endswith('.csv'):
+    distribution_df = pd.read_csv(distribution_path)
+    distribution_df.set_index('case_id', inplace=True, drop=False)
+else:
+    raise ValueError("Unsupported distribution file format. Use .csv or .npz")
+# 手动指定的case列表及对应参数。其余参数均为NaN
+params_add = {
+    'case_id': [10001, 10002, 10003, 10004],
+    'have_run': [True, True, True, True],
+    'impact_velocity': [30.0, 40.0, 50.0, 60.48],
+    'impact_angle': [0,0,0,0],
+    'overlap': [0,0,0,0],
+}
+# 创建DataFrame
+df_add = pd.DataFrame(params_add).set_index('case_id', drop=False)
+# 将手动指定的参数添加到distribution_df的末尾
+distribution_df = pd.concat([distribution_df, df_add], ignore_index=True)
+print(f"Added {len(df_add)} manual cases to distribution DataFrame.")
+# 保存更新后的distribution文件
+if new_distribution_path.endswith('.npz'):
+    np.savez(new_distribution_path, **{col: distribution_df[col].values for col in distribution_df.columns})
+elif new_distribution_path.endswith('.csv'):
+    distribution_df.to_csv(new_distribution_path, index=False)
+    print("Updated distribution file with delta_v has been saved.")
+# %%
+# %%
+# %%
