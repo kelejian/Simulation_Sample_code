@@ -1291,6 +1291,36 @@ if new_distribution_path.endswith('.npz'):
 elif new_distribution_path.endswith('.csv'):
     distribution_df.to_csv(new_distribution_path, index=False)
     print("Updated distribution file with delta_v has been saved.")
-# %%
+# %% 为distribution文件添加一列active_learning，初始值均为NaN
+import numpy as np
+import pandas as pd
+distribution_path = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1006_V4.csv'
+new_distribution_path = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1006_V5.csv'
+# 读取distribution文件
+if distribution_path.endswith('.npz'):
+    distribution_npz = np.load(distribution_path, allow_pickle=True)
+    distribution_df = pd.DataFrame({
+            key: distribution_npz[key]
+            for key in distribution_npz.files
+        }).set_index('case_id', drop=False)
+elif distribution_path.endswith('.csv'):
+    distribution_df = pd.read_csv(distribution_path)
+    distribution_df.set_index('case_id', inplace=True, drop=False)
+else:
+    raise ValueError("Unsupported distribution file format. Use .csv or .npz")
+# 如果distribution_df中没有injury_active_learning_generated列，先在DataFrame中添加该列，初始值为NaN
+if 'injury_active_learning_generated' not in distribution_df.columns:
+    distribution_df['injury_active_learning_generated'] = np.nan
+    print("Added missing column 'injury_active_learning_generated' to distribution DataFrame.")
+if 'injury_active_learning_used' not in distribution_df.columns:
+    distribution_df['injury_active_learning_used'] = np.nan
+    print("Added missing column 'injury_active_learning_used' to distribution DataFrame.")
+# 保存更新后的distribution文件
+if new_distribution_path.endswith('.npz'):
+    np.savez(new_distribution_path, **{col: distribution_df[col].values for col in distribution_df.columns})
+elif new_distribution_path.endswith('.csv'):
+    distribution_df.to_csv(new_distribution_path, index=False)
+    print("Updated distribution file with injury_active_learning columns has been saved.")
+
 # %%
 # %%
