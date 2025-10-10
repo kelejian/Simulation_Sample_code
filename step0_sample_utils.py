@@ -51,12 +51,22 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
     
     # ******************************************************************************
     # 考虑排除部分case_id
-    case_id_exclude = pd.read_csv(r'E:\课题组相关\理想项目\仿真数据库相关\distribution\case_ids_to_set_is_pulse_ok_False_0923.csv', header=None).squeeze().tolist()
-    print(f"\n*排除的case_id数量: {len(case_id_exclude)}")
-    data = pd.DataFrame(data)
-    data = data[~np.isin(data['case_id'], case_id_exclude)]
-    data = {col: data[col].values for col in data.columns}
-    print(f"*排除指定case_id后，剩余样本数: {len(data['case_id'])}\n")
+    # case_id_exclude = pd.read_csv(r'E:\课题组相关\理想项目\仿真数据库相关\distribution\case_ids_to_set_is_pulse_ok_False_0923.csv', header=None).squeeze().tolist()
+    # print(f"\n*排除的case_id数量: {len(case_id_exclude)}")
+    # data = pd.DataFrame(data)
+    # data = data[~np.isin(data['case_id'], case_id_exclude)]
+    # data = {col: data[col].values for col in data.columns}
+    # print(f"*排除指定case_id后，剩余样本数: {len(data['case_id'])}\n")
+    # 排除is_pulse_ok为False的case_id, 不包含is_pulse_ok为NaN的样本
+    if 'case_id' in data and 'is_pulse_ok' in data:
+        print("\n*排除is_pulse_ok为False的case_id, 但不排除is_pulse_ok为NaN的样本")
+        data_df = pd.DataFrame(data)
+        initial_count = len(data_df)
+        data_df = data_df[~(data_df['is_pulse_ok'] == False)]
+        filtered_count = len(data_df)
+        data = {col: data_df[col].values for col in data_df.columns}
+        print(f"*排除is_pulse_ok为False后，剩余样本数: {filtered_count} (初始样本数: {initial_count})\n")
+
     # ******************************************************************************
     
     # 定义参数组
@@ -195,7 +205,7 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
                 in_interval1 = (overlap_data > -1) & (overlap_data <= -0.25)
                 in_interval2 = (overlap_data >= 0.25) & (overlap_data <= 1)
                 is_overlap_valid = np.all(in_interval1 | in_interval2)
-                print(f"  - 检查 'overlap' (在(-1,-0.25]∪[0.25,1]区间内): {'通过' if is_overlap_valid else '失败!!!!!!!'}")
+                print(f"  - 检查 'overlap' 在(-1,-0.25]∪[0.25,1]区间内: {'通过' if is_overlap_valid else '失败!!!!!!!'}")
                 if not is_overlap_valid:
                     invalid_overlap = overlap_data[~(in_interval1 | in_interval2)]
                     print(f"    异常值数量: {len(invalid_overlap)}/{len(overlap_data)}")
@@ -248,10 +258,17 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
                 verification_results['ll2_vs_ll1'] = is_ll2_valid
                 all_checks_passed &= is_ll2_valid
         
-        # 检查 aft < 25 + btf
+        # 检查 aft < 25 + btf, 只考虑case_id>1000的样本
         if 'aft_vs_btf' in special_checks and 'aft' in data and 'btf' in data:
-            aft_data = data['aft'][~np.isnan(data['aft'])]
-            btf_data = data['btf'][~np.isnan(data['btf'])]
+            ##########################################################################################################################
+            if 'case_id' in data:
+                aft_data = data['aft'][(data['case_id'] > 1000) & (~np.isnan(data['aft']))]
+                btf_data = data['btf'][(data['case_id'] > 1000) & (~np.isnan(data['btf']))]
+                print(f"  - 注意: 'aft_vs_btf' 检查仅针对 case_id > 1000 的样本，共计 {len(aft_data)} 个样本")
+            else:
+                aft_data = data['aft'][~np.isnan(data['aft'])]
+                btf_data = data['btf'][~np.isnan(data['btf'])]
+            ##########################################################################################################################
             if len(aft_data) > 0 and len(btf_data) > 0:
                 min_len = min(len(aft_data), len(btf_data))
                 is_aft_valid = np.all(aft_data[:min_len] < (25 + btf_data[:min_len]))
@@ -408,6 +425,13 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
         for i, (param1, param2) in enumerate(available_pairs):
             data1 = data[param1]
             data2 = data[param2]
+            #############################################################
+            # 如果是aft_vs_btf检查，只考虑case_id>1000的样本
+            if flag == 'MADYMO' and (param1, param2) == ('aft', 'btf') and 'case_id' in data:
+                data1 = data1[data['case_id'] > 1000]
+                data2 = data2[data['case_id'] > 1000]
+                print(f"  - 注意: 'aft_vs_btf' 散点图仅针对 case_id > 1000 的样本，共计 {len(data1)} 个样本")
+            #############################################################
             # 找到两个参数都不是NaN的索引
             valid_mask = ~(np.isnan(data1) | np.isnan(data2))
             if np.any(valid_mask):
@@ -464,19 +488,19 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
 
 if __name__ == '__main__':
 
-    verify_and_visualize_params(r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0923_V2.csv', flag='VCS', output_dir='VCS_sample_verification_0923_V2', param_pairs=[('impact_velocity', 'impact_angle'), ('impact_velocity', 'overlap'), ('impact_angle', 'overlap')])
-    # verify_and_visualize_params(r'./distribution_full_test.csv', flag='MADYMO', output_dir='MADYMO_sample_verification',
-    # param_pairs=[
-    #         ('ll1', 'll2'),
-    #         ('sp', 'occupant_type'),
-    #         ('ptf', 'btf'),
-    #         ('llattf', 'btf'),
-    #         ('ttf', 'aft'),
-    #         ('aft', 'btf'),
-    #         ('lla_status', 'llattf'),
-    #         ('aav_status', 'ttf')
-    #         ]
-    #         )
+    verify_and_visualize_params(r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_test2.csv', flag='VCS', output_dir='VCS_sample_verification_test', param_pairs=[('impact_velocity', 'impact_angle'), ('impact_velocity', 'overlap'), ('impact_angle', 'overlap')])
+    verify_and_visualize_params(r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_test2.csv', flag='MADYMO', output_dir='MADYMO_sample_verification_test',
+    param_pairs=[
+            ('ll1', 'll2'),
+            ('sp', 'occupant_type'),
+            ('ptf', 'btf'),
+            ('llattf', 'btf'),
+            ('ttf', 'aft'),
+            ('aft', 'btf'),
+            ('lla_status', 'llattf'),
+            ('aav_status', 'ttf')
+            ]
+            )
 
 # %% 分析碰撞工况参数三维空间填充质量
 import warnings

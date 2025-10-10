@@ -95,7 +95,7 @@ def sample_collision_params(n_samples=6000, skip_points=1024, method='uniform',
             [35, 45, 1.5],
         ]
 
-        # 重叠率 ('overlap') 数据, 调整为 (-1, -0.15]∪[0.15, 1] 范围
+        # 重叠率 ('overlap') 数据, 调整为 (-1, -0.25]∪[0.25, 1] 范围
         overlap_histogram_data = [
             [-1.0, -0.9, 11.5], 
             [-0.9, -0.8, 8.5], 
@@ -155,6 +155,9 @@ def sample_collision_params(n_samples=6000, skip_points=1024, method='uniform',
     overlap = np.where((np.abs(overlap) > 0.99) | (np.abs(overlap) < 0.02), 1.0, overlap)
 
     # 对于重叠率绝对值在0.25~0.3之间的样本，强制碰撞角度与重叠率异号且绝对值>30°
+    # 创建独立的随机数生成器用于角度拒绝采样
+    angle_rejection_rng = np.random.Generator(np.random.PCG64(seed + 999))
+    
     mask = (np.abs(overlap) >= 0.25) & (np.abs(overlap) < 0.3)
     for i in np.where(mask)[0]:
         # 如果角度与重叠率同号或角度绝对值<=30，则重新采样角度
@@ -162,18 +165,18 @@ def sample_collision_params(n_samples=6000, skip_points=1024, method='uniform',
             # 重新采样角度（均匀分布在[-45, 45]，异号且绝对值>30）
             if overlap[i] > 0:
                 if overlap[i] <= 0.26:
-                    impact_angle[i] = np.random.uniform(-45, -40)
+                    impact_angle[i] = angle_rejection_rng.uniform(-45, -40)
                 elif overlap[i] <= 0.28:
-                    impact_angle[i] = np.random.uniform(-45, -35)
+                    impact_angle[i] = angle_rejection_rng.uniform(-45, -35)
                 else:
-                    impact_angle[i] = np.random.uniform(-45, -30)
+                    impact_angle[i] = angle_rejection_rng.uniform(-45, -30)
             else:
                 if overlap[i] >= -0.26:
-                    impact_angle[i] = np.random.uniform(40, 45)
+                    impact_angle[i] = angle_rejection_rng.uniform(40, 45)
                 elif overlap[i] >= -0.28:
-                    impact_angle[i] = np.random.uniform(35, 45)
+                    impact_angle[i] = angle_rejection_rng.uniform(35, 45)
                 else:
-                    impact_angle[i] = np.random.uniform(30, 45)
+                    impact_angle[i] = angle_rejection_rng.uniform(30, 45)
 
     # 创建DataFrame
     data = {
@@ -222,13 +225,12 @@ def sample_collision_params(n_samples=6000, skip_points=1024, method='uniform',
     
     return filename
 
-sample_collision_params(n_samples=7000, skip_points=5048, method='non_uniform', filename=r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0923_2.csv', seed=20250923, case_ids=np.arange(3001, 3001+7000))
+sample_collision_params(n_samples=7000, skip_points=5048, method='non_uniform', filename=r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_test1.csv', seed=20250923, case_ids=np.arange(3001, 3001+7000))
 
 # %% 第二部分：对剩余约束系统参数（包括座椅、乘员体征等参数）进行均匀采样
 import numpy as np
 import pandas as pd
 from scipy.stats import qmc
-import random
 from scipy.interpolate import RectBivariateSpline
 
 class BTFSampler:
@@ -241,7 +243,7 @@ class BTFSampler:
     新版逻辑：即使输入工况为表格中的精确点，也会根据其邻居节点确定一个
     随机范围，从而保证所有采样都具有随机性。
     """
-    def __init__(self):
+    def __init__(self, seed=None):
         # 1. 数据准备
         self.speeds = np.array([25, 35, 45, 55, 65])
         self.overlaps = np.array([25, 50, 75, 100])
@@ -253,9 +255,12 @@ class BTFSampler:
             [35,  10, 15, 10]
         ])
         self.interpolator = RectBivariateSpline(self.speeds, self.overlaps, self.btf_values, kx=1, ky=1)
+        
+        # 创建独立的随机数生成器
+        self.rng = np.random.Generator(np.random.PCG64(seed if seed is not None else 12345))
 
     def _get_bounding_box_values(self, speed, overlap):
-        """找到输入点所在单元格的四个角点的值。"""
+        """找到输入点所在单元格的四个角点的值."""
         s_idx_high = np.searchsorted(self.speeds, speed)
         o_idx_high = np.searchsorted(self.overlaps, overlap)
         s_idx_low = max(0, s_idx_high - 1)
@@ -271,7 +276,7 @@ class BTFSampler:
         ]
 
     def _get_neighbor_values(self, s_idx, o_idx):
-        """获取一个网格点及其直接邻居（上/下/左/右）的值。"""
+        """获取一个网格点及其直接邻居（上/下/左/右）的值."""
         num_speeds, num_overlaps = self.btf_values.shape
         neighbor_vals = [self.btf_values[s_idx, o_idx]] # Start with the point itself
 
@@ -292,15 +297,17 @@ class BTFSampler:
 
     def sample(self, speed: float, overlap_rate: float) -> float:
         """主采样函数"""
-        abs_overlap = abs(overlap_rate)
+        # 将重叠率（-1到1）转换为绝对值的百分比（0到100）
+        abs_overlap_percent = abs(overlap_rate) * 100.0
+        
         clamped_speed = np.clip(speed, self.speeds[0], self.speeds[-1])
-        clamped_overlap = np.clip(abs_overlap, self.overlaps[0], self.overlaps[-1])
+        clamped_overlap = np.clip(abs_overlap_percent, self.overlaps[0], self.overlaps[-1])
 
         # 检查输入是否为表格上的精确网格点
         is_on_grid_point = clamped_speed in self.speeds and clamped_overlap in self.overlaps
 
         if is_on_grid_point:
-            # --- 新逻辑：处理精确表格中网格点 ---
+            # --- 处理精确表格中网格点 ---
             s_idx = np.where(self.speeds == clamped_speed)[0][0]
             o_idx = np.where(self.overlaps == clamped_overlap)[0][0]
             
@@ -312,7 +319,7 @@ class BTFSampler:
             # 最可能的值是该点本身的值
             center_btf = self.btf_values[s_idx, o_idx]
         else:
-            # --- 原逻辑：处理网格之间的点 ---
+            # --- 处理网格之间的点 ---
             center_btf = self.interpolator(clamped_speed, clamped_overlap)[0, 0]
             bounding_values = self._get_bounding_box_values(clamped_speed, clamped_overlap)
             min_btf = min(bounding_values)
@@ -322,9 +329,14 @@ class BTFSampler:
         if min_btf >= max_btf: # 使用>=以处理浮点数精度问题
             sampled_btf = min_btf
         else:
-            sampled_btf = random.triangular(low=min_btf, high=max_btf, mode=center_btf)
+            # 使用独立的随机数生成器进行三角分布采样
+            sampled_btf = self.rng.triangular(left=min_btf, mode=center_btf, right=max_btf)
 
         final_btf = np.clip(sampled_btf, 10, 100)
+        ############################################################
+        # print(f"*Debug: speed={speed:.2f}, overlap={overlap_rate:.3f} => on_grid={is_on_grid_point}")
+        # print(f"        min_btf={min_btf}, max_btf={max_btf}, center_btf={center_btf:.2f} => sampled_btf={sampled_btf:.2f} => final_btf={final_btf:.2f}")
+        ############################################################
         return final_btf
 
 def sample_restraint_params(filename, new_filename,  case_ids, n_samples=None, skip_points=16384, seed=20252025):
@@ -381,7 +393,10 @@ def sample_restraint_params(filename, new_filename,  case_ids, n_samples=None, s
     }
     # 初始化Sobol序列生成器
     sampler = qmc.Sobol(d=len(param_dims), scramble=True, seed=seed)
-    btf_sampler = BTFSampler()
+    btf_sampler = BTFSampler(seed=seed + 888)
+
+    # 为拒绝采样创建独立的随机数生成器
+    rejection_rng = np.random.Generator(np.random.PCG64(seed + 666))
 
     # 跳过前面的初始点
     sampler.fast_forward(skip_points)
@@ -411,16 +426,14 @@ def sample_restraint_params(filename, new_filename,  case_ids, n_samples=None, s
         results.setdefault('occupant_type', []).append(int(occupant_type))
         
         # --- 安全带系统 ---
-        # 安全带二级限力值ll2需要小于一级限力值ll1
-        while True:
-            # 拒绝采样方法
-            ll1_candidate = sampler.random(1)[0, param_dims['ll1']] * (7.0 - 2.0) + 2.0 # ll1 [2, 7]kN
-            ll2_candidate = sampler.random(1)[0, param_dims['ll2']] * (4.5 - 1.5) + 1.5 # ll2 [1.5, 4.5]kN
-
-            if ll1_candidate > ll2_candidate:
-                ll1_val = ll1_candidate
-                ll2_val = ll2_candidate
-                break
+        # 安全带二级限力值ll2需要小于一级限力值ll1，使用独立PRNG进行拒绝采样
+        ll1_val = sample[param_dims['ll1']] * (7.0 - 2.0) + 2.0 # ll1 [2, 7]kN
+        ll2_val = sample[param_dims['ll2']] * (4.5 - 1.5) + 1.5 # ll2 [1.5, 4.5]kN
+        
+        # 使用拒绝采样确保ll1 > ll2
+        while ll1_val <= ll2_val:
+            ll1_val = rejection_rng.uniform(2.0, 7.0)
+            ll2_val = rejection_rng.uniform(1.5, 4.5)
         
         results.setdefault('ll1', []).append(ll1_val)
         results.setdefault('ll2', []).append(ll2_val)
@@ -446,24 +459,21 @@ def sample_restraint_params(filename, new_filename,  case_ids, n_samples=None, s
         results.setdefault('dz', []).append(int(np.floor(sample[param_dims['dz']] * 4) + 1)) # dz 1, 2, 3, 4
 
         # --- 气囊系统 ---
-        # 气囊点火时刻aft需要满足aft < 25 + btf
-        while True:
-            # 拒绝采样方法
-            aft_candidate = sampler.random(1)[0, param_dims['aft']] * (100 - 10) + 10 # aft [10, 100]ms
-            if aft_candidate < (25 + btf_val):
-                aft_val = aft_candidate
-                break
+        # 气囊点火时刻aft需要满足aft < 25 + btf，使用独立PRNG进行拒绝采样
+        aft_val = sample[param_dims['aft']] * (100 - 10) + 10 # aft [10, 100]ms
+        while aft_val >= (25 + btf_val):
+            aft_val = rejection_rng.uniform(10, 100)
+
         results.setdefault('aft', []).append(aft_val)
         
         results.setdefault('aav_status', []).append(int(np.floor(sample[param_dims['aav_status']] * 2))) # aav_status 0或1 0代表不开启二级泄气孔 1代表开启二级泄气孔(此时TTF生效)
 
-        # 计算TTF，需满足TTF > 0.5*BTF
-        while True:
-            ttf_offset_candidate = sampler.random(1)[0, param_dims['ttf_offset']] * 100 # ttf_offset [0, 100]ms
-            ttf_val = aft_val + ttf_offset_candidate
-            if ttf_val > 0.5 * btf_val:
-                ttf_offset_val = ttf_offset_candidate
-                break
+        # 计算TTF，需满足TTF > 0.5*BTF，使用独立PRNG进行拒绝采样
+        ttf_offset_val = sample[param_dims['ttf_offset']] * 100 # ttf_offset [0, 100]ms
+        while (aft_val + ttf_offset_val) <= (0.5 * btf_val):
+            # print(f"重新采样TTF偏移量: {ttf_offset_val:.2f}ms 不满足TTF > 0.5*BTF条件")
+            # print(f"  当前AFT: {aft_val:.2f}ms, BTF: {btf_val:.2f}ms, 计算得到的TTF: {aft_val + ttf_offset_val:.2f}ms")
+            ttf_offset_val = rejection_rng.uniform(0, 100)
         
         results.setdefault('ttf', []).append(aft_val + ttf_offset_val) # ttf = aft + ttf_offset
         
@@ -534,8 +544,8 @@ def sample_restraint_params(filename, new_filename,  case_ids, n_samples=None, s
 
     return new_filename
 
-distribution_file = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1006_V5.csv'
-new_filename = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1007.csv'
+distribution_file = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_test1.csv'
+new_filename = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_test2.csv'
 
 # 读取distribution_file中，is_pulse_ok为TRUE、且'occupant_type'还没有值的的case_id列，转为list，这部分作为填充的case_ids;
 if distribution_file.endswith('.csv'):
@@ -550,4 +560,6 @@ print(f"需要填充约束系统参数的case_id数量: {len(case_ids_to_fill)}"
 print(f"部分case_id示例（开头和结尾）: {case_ids_to_fill[:10]} ... {case_ids_to_fill[-10:]}")
 
 sample_restraint_params(filename=distribution_file, new_filename=new_filename, case_ids=case_ids_to_fill, skip_points=25000, seed=20251007)
+# %%
+
 # %%
