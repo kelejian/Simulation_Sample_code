@@ -141,7 +141,7 @@ def generate_var_files():
         root.find(".//DEFINE[@VAR_NAME='aps.AP_S']").attrib['VALUE'] = str(plp_mm / 1000.0)
 
         # 二级限力切换时刻 (条件 + 单位转换 ms -> s)
-        llattf_s = 2.0 if lla_status == 0 else (llattf_ms / 1000.0)
+        llattf_s = 2.0 if lla_status == 0 else (llattf_ms / 1000.0) # 如果lla_status为0，即表示不切换，直接赋值为2.0秒（远大于碰撞持续时间或仿真时长）
         root.find(".//DEFINE[@VAR_NAME='load_limit.R_LL2TF']").attrib['VALUE'] = str(llattf_s)
 
         # D环高度 (离散映射)
@@ -194,11 +194,11 @@ def generate_var_files():
         cdt_fun_node = root.find(".//DEFINE[@VAR_NAME='trigger_time.cdt_fun']")
         if aav_status == 0:
             # 不切换
-            cdt_value = "| XI YI |\n0 1\n0.5 1\n\n"
+            cdt_value = "| XI YI |\n0 1\n0.5 1\n\n"  # 表示0~0.5秒内值一直为1  仿真时长小于0.5s
         else: # aav_status == 1
             # 切换
             ttf_s = ttf_ms / 1000.0
-            cdt_value = (f"| XI YI |\n0 1\n{ttf_s:.4f} 1\n{ttf_s + 0.001:.4f} 1.5\n0.5 1.5\n\n")
+            cdt_value = (f"| XI YI |\n0 1\n{ttf_s:.4f} 1\n{ttf_s + 0.001:.4f} 1.5\n0.5 1.5\n\n")  # 在ttf时刻后0.001秒内从1跃变到1.5，然后一直为1.5直到0.5秒
         cdt_fun_node.attrib['VALUE'] = cdt_value
         #cdt_fun_node.attrib['VALUE'] = cdt_value.strip()
 

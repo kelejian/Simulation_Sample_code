@@ -434,7 +434,6 @@ def sample_restraint_params(filename, new_filename,  case_ids, n_samples=None, s
         while ll1_val <= ll2_val:
             ll1_val = rejection_rng.uniform(2.0, 7.0)
             ll2_val = rejection_rng.uniform(1.5, 4.5)
-        
         results.setdefault('ll1', []).append(ll1_val)
         results.setdefault('ll2', []).append(ll2_val)
 
@@ -449,13 +448,18 @@ def sample_restraint_params(filename, new_filename,  case_ids, n_samples=None, s
         results.setdefault('btf', []).append(btf_val)
 
         results.setdefault('pp', []).append(sample[param_dims['pp']] * (100 - 40) + 40) # pp [40, 100]mm
-        # 计算PTF (确定性)
-        results.setdefault('ptf', []).append(btf_val + 7.0) # ptf = btf + 7ms
+        results.setdefault('ptf', []).append(btf_val + 7.0) # 算PTF (确定性) ptf = btf + 7ms
         results.setdefault('plp', []).append(sample[param_dims['plp']] * (80 - 20) + 20) # plp [20, 80]mm
-        results.setdefault('lla_status', []).append(int(np.floor(sample[param_dims['lla_status']] * 2))) # lla_status 0或1 0代表不切换二级限力 1代表切换二级限力(此时LLATTF生效)
-        # 计算LLATTF
+
+        lla_status_val = int(np.floor(sample[param_dims['lla_status']] * 2))
+        results.setdefault('lla_status', []).append(lla_status_val) # lla_status 0或1 0代表不切换二级限力 1代表切换二级限力(此时LLATTF生效)
+        # 计算LLATTF，如果LLASTATUS=0则LLATTF=0; 如果LLASTATUS=1则LLATTF = BTF + LLATTF_OFFSET
         llattf_offset_val = sample[param_dims['llattf_offset']] * 100 # llattf_offset [0, 100]ms
-        results.setdefault('llattf', []).append(btf_val + llattf_offset_val) # llattf = btf + llattf_offset
+        if lla_status_val == 0:
+            results.setdefault('llattf', []).append(0.0)
+        else: # lla_status_val == 1 
+            results.setdefault('llattf', []).append(btf_val + llattf_offset_val) # llattf = btf + llattf_offset
+
         results.setdefault('dz', []).append(int(np.floor(sample[param_dims['dz']] * 4) + 1)) # dz 1, 2, 3, 4
 
         # --- 气囊系统 ---
@@ -463,19 +467,21 @@ def sample_restraint_params(filename, new_filename,  case_ids, n_samples=None, s
         aft_val = sample[param_dims['aft']] * (100 - 10) + 10 # aft [10, 100]ms
         while aft_val >= (25 + btf_val):
             aft_val = rejection_rng.uniform(10, 100)
-
         results.setdefault('aft', []).append(aft_val)
-        
-        results.setdefault('aav_status', []).append(int(np.floor(sample[param_dims['aav_status']] * 2))) # aav_status 0或1 0代表不开启二级泄气孔 1代表开启二级泄气孔(此时TTF生效)
 
-        # 计算TTF，需满足TTF > 0.5*BTF，使用独立PRNG进行拒绝采样
+        aav_status_val = int(np.floor(sample[param_dims['aav_status']] * 2))
+        results.setdefault('aav_status', []).append(aav_status_val) # aav_status 0或1 0代表不开启二级泄气孔 1代表开启二级泄气孔(此时TTF生效)
+        # 计算TTF，如果aav_status=0则TTF=0; 如果aav_status=1则TTF = AFT + TTF_OFFSET
         ttf_offset_val = sample[param_dims['ttf_offset']] * 100 # ttf_offset [0, 100]ms
-        while (aft_val + ttf_offset_val) <= (0.5 * btf_val):
-            # print(f"重新采样TTF偏移量: {ttf_offset_val:.2f}ms 不满足TTF > 0.5*BTF条件")
-            # print(f"  当前AFT: {aft_val:.2f}ms, BTF: {btf_val:.2f}ms, 计算得到的TTF: {aft_val + ttf_offset_val:.2f}ms")
-            ttf_offset_val = rejection_rng.uniform(0, 100)
-        
-        results.setdefault('ttf', []).append(aft_val + ttf_offset_val) # ttf = aft + ttf_offset
+        if aav_status_val == 0:
+            results.setdefault('ttf', []).append(0.0)
+        else: # aav_status_val == 1
+            # 需满足TTF > 0.5*BTF，否则使用独立PRNG进行拒绝采样
+            while (aft_val + ttf_offset_val) <= (0.5 * btf_val):
+                # print(f"重新采样TTF偏移量: {ttf_offset_val:.2f}ms 不满足TTF > 0.5*BTF条件")
+                # print(f"  当前AFT: {aft_val:.2f}ms, BTF: {btf_val:.2f}ms, 计算得到的TTF: {aft_val + ttf_offset_val:.2f}ms")
+                ttf_offset_val = rejection_rng.uniform(0, 100)
+            results.setdefault('ttf', []).append(aft_val + ttf_offset_val) # ttf = aft + ttf_offset
         
         # --- 座椅参数 ---
         # 根据乘员体型决定座椅位置范围
