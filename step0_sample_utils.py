@@ -552,7 +552,7 @@ if __name__ == '__main__':
 
 
 
-# %% 读取指定目录下的acc的xlsx文件，仅将distribution文件中的对应行的have_run值更新为True或保持False，其它不变
+# %% 1.读取指定目录下的acc的xlsx文件，仅将distribution文件中的对应行的have_run值更新为True或保持False，其它不变
 import os
 import pandas as pd
 def update_have_run_status(acc_dir, distribution_path, new_distribution_path):
@@ -602,7 +602,7 @@ new_distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\
 
 update_have_run_status(xlsx_results_dir, distribution_path, new_distribution_path)
 
-# %% 读取指定目录下的acc的csv文件，将distribution文件中的对应行的is_pulse_ok值更新为True
+# %% 2.读取指定目录下的acc的csv文件，将distribution文件中的对应行的is_pulse_ok值更新为True
 import os
 import pandas as pd
 def update_is_pulse_ok_status(acc_dir, distribution_path, new_distribution_path):
@@ -653,7 +653,7 @@ new_distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\
 
 update_is_pulse_ok_status(acc_data_dir, distribution_path, new_distribution_path)
 
-# %% 将指定case_id的is_pulse_ok改为False
+# %% 3.根据check_csv_pulse结果，将指定case_id的is_pulse_ok改为False
 import pandas as pd
 distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0926_V2.csv'
 new_distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0926_V3.csv'
@@ -683,12 +683,12 @@ if new_distribution_path.endswith('.npz'):
 elif new_distribution_path.endswith('.csv'):
     distribution_df.to_csv(new_distribution_path, index=False)
     print("Updated distribution file has been saved.")
-# %% 将头颈胸损伤标签（HIC15, Dmax, Nij）添加到distribution文件中
+# %% -Final.将头颈胸损伤标签（HIC15, Dmax, Nij）添加到distribution文件中
 import numpy as np
 import pandas as pd
-distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0928_V3.csv'
-new_distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0929.csv'
-Injury_labels_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\injury_labels_0929.xlsx'
+distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1015.csv'
+new_distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1016.csv'
+Injury_labels_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\Injury_labels_1016.xlsx'
 # 读取distribution文件
 if distribution_path.endswith('.npz'):
     distribution_npz = np.load(distribution_path, allow_pickle=True)
@@ -705,7 +705,7 @@ else:
 # 读取injury_labels文件
 injury_df = pd.read_excel(Injury_labels_path).set_index('case_id', drop=False)
 
-injury_columns = ['HIC15', 'Dmax', 'Nij']
+injury_columns = ['HIC15', 'Dmax', 'Nij'] # Dmax原始单位为m，这里要转换为mm
 
 # 如果distribution_df中没有injury_columns，先在DataFrame中添加这些列，初始值为NaN
 for col in injury_columns:
@@ -745,7 +745,7 @@ elif new_distribution_path.endswith('.csv'):
     distribution_df.to_csv(new_distribution_path, index=False)
     print("Updated distribution file with injury labels has been saved.")
     
-# %% 为distribution文件计算delta-v。如果没有该列，则添加该列，初始值为NaN
+# %% 4.为distribution文件计算delta-v。如果没有该列，则添加该列，初始值为NaN
 import numpy as np
 import pandas as pd
 from scipy import integrate
@@ -821,6 +821,115 @@ elif new_distribution_path.endswith('.csv'):
     distribution_df.to_csv(new_distribution_path, index=False)
     print("Updated distribution file with delta_v has been saved.")
 
+
+# %% 在case_id列后面插入一列is_driver_side, 表示是否为主驾侧case，主驾侧为1，副驾侧为0；初始化为1
+import pandas as pd
+distribution_path = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1016.csv'
+new_distribution_path = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1017.csv'
+# 读取distribution文件
+if distribution_path.endswith('.npz'):
+    distribution_npz = np.load(distribution_path, allow_pickle=True)
+    distribution_df = pd.DataFrame({
+            key: distribution_npz[key]
+            for key in distribution_npz.files
+        }).set_index('case_id', drop=False)
+elif distribution_path.endswith('.csv'):
+    distribution_df = pd.read_csv(distribution_path)
+    distribution_df.set_index('case_id', inplace=True, drop=False)
+else:
+    raise ValueError("Unsupported distribution file format. Use .csv or .npz")
+# 在case_id列后面插入一列is_driver_side, 初始化为1
+distribution_df.insert(1, 'is_driver_side', 1)
+# 保存更新后的distribution文件
+if new_distribution_path.endswith('.npz'):
+    np.savez(new_distribution_path, **{col: distribution_df[col].values for col in distribution_df.columns})
+elif new_distribution_path.endswith('.csv'):
+    distribution_df.to_csv(new_distribution_path, index=False)
+    print("Updated distribution file with is_driver_side has been saved.")
+
+
+# %% 为当前distribution文件初始化副驾侧的行信息
+# 在文件末尾空一行，然后添加副驾侧的行，内容为：将前面主驾侧的行中的case_id复制过来（并加50000）、并把对应的have_run, is_pulse_ok, impact_velocity	impact_angle	overlap, delta_vx(kph)	delta_vy(kph)	delta_v(kph) 的值都复制过来，并把is_driver_side设置为0，其它保持nan
+import numpy as np
+import pandas as pd
+distribution_path = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1017.csv'
+new_distribution_path = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1017_V2.csv'
+# 读取distribution文件
+if distribution_path.endswith('.npz'):
+    distribution_npz = np.load(distribution_path, allow_pickle=True)
+    distribution_df = pd.DataFrame({
+            key: distribution_npz[key]
+            for key in distribution_npz.files
+        }).set_index('case_id', drop=False)
+elif distribution_path.endswith('.csv'):
+    distribution_df = pd.read_csv(distribution_path)
+    distribution_df.set_index('case_id', inplace=True, drop=False)
+else:
+    raise ValueError("Unsupported distribution file format. Use .csv or .npz")
+
+# 需要复制的列
+columns_to_copy = ['have_run', 'is_pulse_ok', 'impact_velocity', 'impact_angle', 'overlap', 'delta_vx(kph)', 'delta_vy(kph)', 'delta_v(kph)']
+# 遍历当前DataFrame，找到is_driver_side==1的行，复制并修改后添加到DataFrame末尾，除了需要复制的列，其它列保持nan
+new_rows = []
+for idx, row in distribution_df.iterrows():
+    if row['is_driver_side'] == 1:
+        new_row = {col: np.nan for col in distribution_df.columns}
+        new_row['case_id'] = row['case_id'] + 50000
+        new_row['is_driver_side'] = 0
+        for col in columns_to_copy:
+            new_row[col] = row[col]
+        new_rows.append(new_row)
+
+# 将新行添加到DataFrame末尾
+if new_rows:
+    distribution_df = pd.concat([distribution_df, pd.DataFrame(new_rows)], ignore_index=True)
+    print(f"Added {len(new_rows)} passenger side cases to distribution DataFrame.")
+else:
+    print("No driver side cases found to copy.")
+
+# 保存更新后的distribution文件
+if new_distribution_path.endswith('.npz'):
+    np.savez(new_distribution_path, **{col: distribution_df[col].values for col in distribution_df.columns})
+elif new_distribution_path.endswith('.csv'):
+    distribution_df.to_csv(new_distribution_path, index=False)
+    print("Updated distribution file with passenger side cases has been saved.")
+
+# %% 5.将主驾侧的have_run,is_pulse_ok,delta_vx(kph),delta_vy(kph),delta_v(kph) 的值复制到对应的副驾侧行中
+import numpy as np
+import pandas as pd
+distribution_path = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1017_V2.csv'
+new_distribution_path = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1017_final.csv'
+# 读取distribution文件
+if distribution_path.endswith('.npz'):
+    distribution_npz = np.load(distribution_path, allow_pickle=True)
+    distribution_df = pd.DataFrame({
+            key: distribution_npz[key]
+            for key in distribution_npz.files
+        }).set_index('case_id', drop=False)
+elif distribution_path.endswith('.csv'):
+    distribution_df = pd.read_csv(distribution_path)
+    distribution_df.set_index('case_id', inplace=True, drop=False)
+else:
+    raise ValueError("Unsupported distribution file format. Use .csv or .npz")
+# 遍历当前DataFrame，找到is_driver_side==0的行，复制对应主驾侧行的have_run,is_pulse_ok,delta_vx(kph),delta_vy(kph),delta_v(kph) 的值
+for idx, row in distribution_df.iterrows():
+    if row['is_driver_side'] == 0:
+        driver_case_id = row['case_id'] - 50000
+        driver_row = distribution_df[distribution_df['case_id'] == driver_case_id]
+        if not driver_row.empty:
+            distribution_df.at[idx, 'have_run'] = driver_row.iloc[0]['have_run']
+            distribution_df.at[idx, 'is_pulse_ok'] = driver_row.iloc[0]['is_pulse_ok']
+            distribution_df.at[idx, 'delta_vx(kph)'] = driver_row.iloc[0]['delta_vx(kph)']
+            distribution_df.at[idx, 'delta_vy(kph)'] = driver_row.iloc[0]['delta_vy(kph)']
+            distribution_df.at[idx, 'delta_v(kph)'] = driver_row.iloc[0]['delta_v(kph)']
+        else:
+            print(f"Warning: Corresponding driver side case_id {driver_case_id} not found for passenger side case_id {row['case_id']}.")
+# 保存更新后的distribution文件
+if new_distribution_path.endswith('.npz'):
+    np.savez(new_distribution_path, **{col: distribution_df[col].values for col in distribution_df.columns})
+elif new_distribution_path.endswith('.csv'):
+    distribution_df.to_csv(new_distribution_path, index=False)
+    print("Final updated distribution file has been saved.")
 
 # %%
 # %%

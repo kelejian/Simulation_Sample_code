@@ -603,5 +603,4 @@ print("\n--- 随机采样结果示例 (第一个样本点) ---")
 for key, value in random_results.items():
     print(f"{key:<20}: {value[0]:.4f}")
 
-# %%
 # %% 

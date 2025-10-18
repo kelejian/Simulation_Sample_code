@@ -11,14 +11,14 @@ import pandas as pd
 
 # --- 1. 全局配置 ---
 
-# distribution参数文件路径
-PARAM_FILE_PATH = r'I:\000 LX\dataset0715\02\distribution_0923_V2.csv'
+# .npz参数文件路径
+PARAM_FILE_PATH = r'I:\000 LX\dataset0715\03\distribution_1015.csv'
 # .var模板文件路径
-BASE_VAR_FILE_PATH = 'basic_variables.var'
+BASE_VAR_FILE_PATH = r'I:\000 LX\dataset0715\03\basic_variables.var'
 # 碰撞波形CSV文件所在的目录
-PULSE_FILES_DIR = r'I:\000 LX\dataset0715\03\acceleration_data_200ms'
+PULSE_FILES_DIR = r'I:\000 LX\dataset0715\03\acc_data_1012_354'
 # 生成的.var文件保存的目录
-OUTPUT_DIR = './output_vars/'
+OUTPUT_DIR = './主驾output_vars_1012/'
 
 # --- 代码主体 ---
 
@@ -26,7 +26,7 @@ def generate_var_files():
     """
     主函数，执行所有文件的生成任务。
     """
-    # --- 2. 加载参数矩阵 ---
+    # --- 加载参数矩阵 ---
     try:
         if PARAM_FILE_PATH.endswith('.npz'):
             data = np.load(PARAM_FILE_PATH, allow_pickle=True)
@@ -141,7 +141,7 @@ def generate_var_files():
         root.find(".//DEFINE[@VAR_NAME='aps.AP_S']").attrib['VALUE'] = str(plp_mm / 1000.0)
 
         # 二级限力切换时刻 (条件 + 单位转换 ms -> s)
-        llattf_s = 2.0 if lla_status == 0 else (llattf_ms / 1000.0) # 如果lla_status为0，即表示不切换，直接赋值为2.0秒（远大于碰撞持续时间或仿真时长）
+        llattf_s = 2.0 if lla_status == 0 else (llattf_ms / 1000.0)
         root.find(".//DEFINE[@VAR_NAME='load_limit.R_LL2TF']").attrib['VALUE'] = str(llattf_s)
 
         # D环高度 (离散映射)
@@ -194,11 +194,11 @@ def generate_var_files():
         cdt_fun_node = root.find(".//DEFINE[@VAR_NAME='trigger_time.cdt_fun']")
         if aav_status == 0:
             # 不切换
-            cdt_value = "| XI YI |\n0 1\n0.5 1\n\n"  # 表示0~0.5秒内值一直为1  仿真时长小于0.5s
+            cdt_value = "| XI YI |\n0 1\n0.5 1\n\n"
         else: # aav_status == 1
             # 切换
             ttf_s = ttf_ms / 1000.0
-            cdt_value = (f"| XI YI |\n0 1\n{ttf_s:.4f} 1\n{ttf_s + 0.001:.4f} 1.5\n0.5 1.5\n\n")  # 在ttf时刻后0.001秒内从1跃变到1.5，然后一直为1.5直到0.5秒
+            cdt_value = (f"| XI YI |\n0 1\n{ttf_s:.4f} 1\n{ttf_s + 0.001:.4f} 1.5\n0.5 1.5\n\n")
         cdt_fun_node.attrib['VALUE'] = cdt_value
         #cdt_fun_node.attrib['VALUE'] = cdt_value.strip()
 
