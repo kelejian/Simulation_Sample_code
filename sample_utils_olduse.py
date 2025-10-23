@@ -186,8 +186,8 @@ new_df.to_csv(new_name, index=False)
 # %% 对比两个csv文件内容的差异
 import pandas as pd
 import numpy as np
-file1 = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0926_V2.csv'
-file2 = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0926_V3.csv'
+file1 = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1018.csv'
+file2 = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1018_V6.csv'
 
 df1 = pd.read_csv(file1)
 df2 = pd.read_csv(file2)
@@ -221,7 +221,7 @@ else:
             diff_cols = row1[row1 != row2].index.tolist()
             diff_details = {col: (row1[col], row2[col]) for col in diff_cols}
             differences.append((i+1, diff_details))  # 行号从1开始
-            print(f"第 {i+1} 行不同: {diff_details}")
+            print(f"第 {i+1} 行case{row1['case_id']}不同: {diff_details}")
     
     if not differences:
         print("两个文件内容完全一致。")
