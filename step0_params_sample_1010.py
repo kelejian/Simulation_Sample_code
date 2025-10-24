@@ -540,18 +540,18 @@ def sample_restraint_params(filename, new_filename,  case_ids, n_samples=None, s
     print(f"约束系统参数采样并填充完成，结果已保存至 '{new_filename}'")
     
     # 打印一个样本作为示例
-    if is_npz:
-        print("\n--- 采样结果示例 (第一个case_id) ---")
-        for key in results:
-            print(f"{key:<20}: {results[key][0]:.4f}")
-    else:
-        print("\n更新后的前5个样本:")
-        print(updated_data.head())
+    # if is_npz:
+    #     print("\n--- 采样结果示例 (第一个case_id) ---")
+    #     for key in results:
+    #         print(f"{key:<20}: {results[key][0]:.4f}")
+    # else:
+    #     print("\n更新后的前5个样本:")
+    #     print(updated_data.head())
 
     return new_filename
 
-distribution_file = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1018_V6.csv'
-new_filename = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1020.csv'
+distribution_file = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1023.csv'
+new_filename = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1023_V2.csv'
 
 # 读取distribution_file中，is_pulse_ok为TRUE、且'occupant_type'还没有值的的case_id列，转为list，这部分作为填充的case_ids;
 if distribution_file.endswith('.csv'):
@@ -562,9 +562,17 @@ if distribution_file.endswith('.npz'):
         df = pd.DataFrame({key: data[key] for key in data.files})
         case_ids_to_fill = df[(df['is_pulse_ok'] == True) & (df['occupant_type'].isnull())]['case_id'].tolist()
 
-print(f"需要填充约束系统参数的case_id数量: {len(case_ids_to_fill)}")
-print(f"部分case_id示例（开头和结尾）: {case_ids_to_fill[:10]} ... {case_ids_to_fill[-10:]}")
+###################################################################################################################################################
+# resample逻辑
+case_ids_to_fill_ori = pd.read_csv(r'E:\课题组相关\理想项目\仿真数据库相关\distribution\resample_before1023.csv', header=None).iloc[:, 0].dropna().astype(int).to_list()
+# 只选择'is_injury_ok'！=True的case_id和'is_pulse_ok'==True的case_id,以及occupant_type为1/2/3之一时进行填充
+case_ids_to_fill = [cid for cid in case_ids_to_fill_ori if df.loc[df['case_id'] == cid, 'is_pulse_ok'].values[0] == True and df.loc[df['case_id'] == cid, 'is_injury_ok'].values[0] != True and df.loc[df['case_id'] == cid, 'occupant_type'].values[0] in [1, 2, 3]]
+print(f"被过滤掉的case_id: {set(case_ids_to_fill_ori) - set(case_ids_to_fill)}")
+###################################################################################################################################################
 
-sample_restraint_params(filename=distribution_file, new_filename=new_filename, case_ids=case_ids_to_fill, skip_points=31000, seed=20251020)
+print(f"需要填充约束系统参数的case_id数量: {len(case_ids_to_fill)}")
+# print(f"部分case_id示例（开头和结尾）: {case_ids_to_fill[:10]} ... {case_ids_to_fill[-10:]}")
+
+sample_restraint_params(filename=distribution_file, new_filename=new_filename, case_ids=case_ids_to_fill, skip_points=31000, seed=20251024)
 
 # %%

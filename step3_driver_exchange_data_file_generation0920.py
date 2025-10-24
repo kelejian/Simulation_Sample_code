@@ -12,16 +12,18 @@ import pandas as pd
 # --- 1. 全局配置 ---
 
 # .npz参数文件路径
-PARAM_FILE_PATH = r'I:\000 LX\dataset0715\03\distribution_1015.csv'
+PARAM_FILE_PATH = r'I:\000 LX\dataset0715\03\distribution_1024.csv'
 # .var模板文件路径
 BASE_VAR_FILE_PATH = r'I:\000 LX\dataset0715\03\basic_variables.var'
 # 碰撞波形CSV文件所在的目录
-PULSE_FILES_DIR = r'I:\000 LX\dataset0715\03\acc_data_1012_354'
+PULSE_FILES_DIR = r'I:\000 LX\dataset0715\03\acc_data_1020_243'
+PULSE_FILES_DIR = r'E:\VCS_acc_data\acc_data_before1022_4798'
 # 生成的.var文件保存的目录
-OUTPUT_DIR = './主驾output_vars_1012/'
+OUTPUT_DIR = './主驾output_vars_1024/'
+OUTPUT_DIR = r'I:\000 LX\dataset0715\03\主驾output_vars_resample_before1023'
 # 指定case_id列表（可选），如果不指定则处理对应目录下所有符合条件的文件
 CASE_ID_LIST = None
-CASE_ID_LIST = pd.read_csv(r'E:\课题组相关\理想项目\仿真数据库相关\distribution\resample_before1023.csv').iloc[:, 0].to_list()
+CASE_ID_LIST = pd.read_csv(r'I:\000 LX\dataset0715\03\resample_before1023.csv', header=None).iloc[:, 0].dropna().astype(int).to_list()
 # --- 代码主体 ---
 
 def generate_var_files():
@@ -52,7 +54,7 @@ def generate_var_files():
         print(f"已创建输出目录: '{OUTPUT_DIR}'")
 
     # --- 3. 核心处理循环 ---
-    # 从PULSE_FILES_DIR目录下读取以x开头，.csv结尾的文件，统计文件数量作为样本数量, 并得到caseid列表
+    # 从PULSE_FILES_DIR目录下读取以x开头，.csv结尾的文件，统计文件数量作为样本数量, 并得到caseid列表(!!都是主驾caseid!!)
     case_ids = []
     # case_paths = []
     if not os.path.exists(PULSE_FILES_DIR):
@@ -76,18 +78,25 @@ def generate_var_files():
         if CASE_ID_LIST and case_id not in CASE_ID_LIST: # 如果指定了工况列表且当前工况不在列表中，则跳过
             # print(f"  - 工况ID {case_id} 不在指定列表中，跳过该工况。")
             continue
+
         # ----------------------------------------------
         print(f"正在处理工况: {case_id}...")
         # --- 3.1. 获取当前工况的参数值 ---
-        
         if case_id not in data.index:
             print(f"  - !!警告：工况ID {case_id} 在参数文件中未找到，跳过该工况。")
             continue
+        if data.loc[case_id, 'is_driver'] != 1:
+            # print(f"  - 工况ID {case_id} 非主驾工况，跳过该工况。")
+            continue
+        
         # 跳过碰撞波形数据有问题的工况(is_pulse_ok=False)
-        if data.loc[case_id, 'is_pulse_ok'] == False:
+        if data.loc[case_id, 'is_pulse_ok'] != True:
             # print(f"  - !!警告：工况ID {case_id} 的碰撞波形数据有问题，跳过该工况。")
             continue
-
+ 
+        if data.loc[case_id, 'is_injury_ok'] == True:
+            print(f"  - 工况ID {case_id} 乘员伤害数据正常，跳过该工况。")
+            continue
         # 注意data是一个DataFrame，可以直接通过loc按行索引取值
         occupant_type = data.loc[case_id, 'occupant_type']
         ll1_kn = data.loc[case_id, 'll1']

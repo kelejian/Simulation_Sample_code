@@ -861,9 +861,9 @@ elif new_distribution_path.endswith('.csv'):
 
 # %% ex.读取resample.csv，获取需要修改采样值的case_id列表，增加座椅前后位置sp
 import pandas as pd
-resample_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\resample_before1023.csv'
-distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1023.csv'
-new_distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1024.csv'
+resample_path = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\resample_before1023.csv'
+distribution_path = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1023_V2.csv'
+new_distribution_path = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1024.csv'
 # 读取distribution文件
 if distribution_path.endswith('.npz'):
     distribution_npz = np.load(distribution_path, allow_pickle=True)
@@ -877,7 +877,7 @@ elif distribution_path.endswith('.csv'):
 else:
     raise ValueError("Unsupported distribution file format. Use .csv or .npz")
 # resample只有一列，没有表头
-resample_cases = pd.read_csv(resample_path, header=None).iloc[:, 0].to_list()
+resample_cases = pd.read_csv(resample_path, header=None).iloc[:, 0].dropna().astype(int).to_list()
 print(f"Total case_ids to update sp: {len(resample_cases)}")
 # 三种体型假人各有范围：5%假人:[+10mm, +110mm]；50%假人: [-80mm, +80mm]; 95%假人: [-110mm, +40mm] 向前移动为正，向后移动为负。
 # 先根据三种假人类型，画出resample_cases的各自的sp分布直方图，确认范围合理性
@@ -907,11 +907,14 @@ for case_id in resample_cases:
         occupant_type = distribution_df.at[case_id, 'occupant_type']
         old_sp = distribution_df.at[case_id, 'sp']
         if occupant_type == 1:  # 5%假人
-            new_sp = np.clip((old_sp + 110) / 2, 10, 110)
+            # new_sp = np.clip((old_sp + 110) / 2, 10, 110)
+            new_sp = np.random.uniform(40, 85)  
         elif occupant_type == 2:  # 50%假人
-            new_sp = np.clip((old_sp + 80) / 2, -80, 80)
+            # new_sp = np.clip((old_sp + 80) / 2, -80, 80)
+            new_sp = np.random.uniform(-30, 35)  
         elif occupant_type == 3:  # 95%假人
-            new_sp = np.clip((old_sp + 40) / 2, -110, 40)
+            # new_sp = np.clip((old_sp + 40) / 2, -110, 40)
+            new_sp = np.random.uniform(-60, 5)  
         else:
             print(f"Error: Unknown occupant_type {occupant_type} for case_id {case_id}. Skipping sp update.")
             continue
@@ -938,4 +941,5 @@ elif new_distribution_path.endswith('.csv'):
     print("Updated distribution file with new sp values has been saved.")
 
 # %%
+
 # %%

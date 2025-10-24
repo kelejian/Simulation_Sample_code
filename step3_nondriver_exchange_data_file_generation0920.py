@@ -21,9 +21,9 @@ PULSE_FILES_DIR = r'I:\000 LX\dataset0715\03\acc_data_1012_354'
 OUTPUT_DIR = './副驾output_vars_1012/'
 NON_DRIVER_OFFSET = 50000  # 副驾工况ID相对于主驾工况ID的偏移量
 # 指定case_id列表（可选），如果不指定则处理对应目录下所有符合条件的文件
+# CASE_ID_LIST = pd.read_csv(r'I:\000 LX\dataset0715\03\resample_before1023.csv', header=None).iloc[:, 0].dropna().astype(int).to_list()
+# CASE_ID_LIST = [cid - NON_DRIVER_OFFSET for cid in CASE_ID_LIST]  # 转换为主驾工况ID列表
 CASE_ID_LIST = None
-CASE_ID_LIST = pd.read_csv(r'E:\课题组相关\理想项目\仿真数据库相关\distribution\resample_before1023.csv').iloc[:, 0].to_list()
-CASE_ID_LIST = [cid - NON_DRIVER_OFFSET for cid in CASE_ID_LIST]  # 转换为主驾工况ID列表
 # --- 代码主体 ---
 
 def generate_var_files():
@@ -54,7 +54,7 @@ def generate_var_files():
         print(f"已创建输出目录: '{OUTPUT_DIR}'")
 
     # --- 3. 核心处理循环 ---
-    # 从PULSE_FILES_DIR目录下读取以x开头，.csv结尾的文件，统计文件数量作为样本数量, 并得到caseid列表
+    # 从PULSE_FILES_DIR目录下读取以x开头，.csv结尾的文件，统计文件数量作为样本数量, 并得到caseid列表(!!都是主驾caseid!!)
     case_ids = []
     # case_paths = []
     if not os.path.exists(PULSE_FILES_DIR):
@@ -75,7 +75,8 @@ def generate_var_files():
         # 决定哪些工况跳过
         # if case_id > 100:
         #     break
-        if CASE_ID_LIST and case_id not in CASE_ID_LIST: # 如果指定了工况列表且当前工况不在列表中，则跳过
+        if CASE_ID_LIST and case_id not in CASE_ID_LIST:
+            # 如果指定了工况列表且当前工况不在列表中，则跳过
             # print(f"  - 工况ID {case_id} 不在指定列表中，跳过该工况。")
             continue
         # ----------------------------------------------
@@ -86,9 +87,15 @@ def generate_var_files():
         if None_driver_case_id not in data.index:
             print(f"  - !!警告：副驾工况ID {None_driver_case_id} 在参数文件中未找到，跳过该工况。")
             continue
+        if data.loc[None_driver_case_id, 'is_driver'] != 0:
+            # print(f"  - 工况ID {case_id} 对应的副驾工况ID {None_driver_case_id} 非副驾工况，跳过该工况。")
+            continue
         # 跳过碰撞波形数据有问题的工况(is_pulse_ok=False)
         if data.loc[None_driver_case_id, 'is_pulse_ok'] == False:
             # print(f"  - !!警告：工况ID {None_driver_case_id} 的碰撞波形数据有问题，跳过该工况。")
+            continue
+        if data.loc[None_driver_case_id, 'is_injury_ok'] == True:
+            print(f"  - 工况ID {None_driver_case_id} 乘员伤害数据正常，跳过该工况。")
             continue
 
         # 注意data是一个DataFrame，可以直接通过loc按行索引取值
