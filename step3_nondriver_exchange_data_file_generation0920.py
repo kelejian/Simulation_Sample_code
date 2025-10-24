@@ -21,6 +21,7 @@ PULSE_FILES_DIR = r'I:\000 LX\dataset0715\03\acc_data_1012_354'
 OUTPUT_DIR = './副驾output_vars_1012/'
 NON_DRIVER_OFFSET = 50000  # 副驾工况ID相对于主驾工况ID的偏移量
 # 指定case_id列表（可选），如果不指定则处理对应目录下所有符合条件的文件
+CASE_ID_LIST = None
 CASE_ID_LIST = pd.read_csv(r'E:\课题组相关\理想项目\仿真数据库相关\distribution\resample_before1023.csv').iloc[:, 0].to_list()
 CASE_ID_LIST = [cid - NON_DRIVER_OFFSET for cid in CASE_ID_LIST]  # 转换为主驾工况ID列表
 # --- 代码主体 ---
@@ -74,7 +75,7 @@ def generate_var_files():
         # 决定哪些工况跳过
         # if case_id > 100:
         #     break
-        if 'CASE_ID_LIST' in locals() and CASE_ID_LIST and case_id not in CASE_ID_LIST: # 如果指定了工况列表且当前工况不在列表中，则跳过
+        if CASE_ID_LIST and case_id not in CASE_ID_LIST: # 如果指定了工况列表且当前工况不在列表中，则跳过
             # print(f"  - 工况ID {case_id} 不在指定列表中，跳过该工况。")
             continue
         # ----------------------------------------------
