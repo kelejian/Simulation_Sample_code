@@ -74,7 +74,7 @@ def generate_var_files():
         # 决定哪些工况跳过
         # if case_id > 100:
         #     break
-        if CASE_ID_LIST and case_id not in CASE_ID_LIST: # 如果指定了工况列表且当前工况不在列表中，则跳过
+        if 'CASE_ID_LIST' in locals() and CASE_ID_LIST and case_id not in CASE_ID_LIST: # 如果指定了工况列表且当前工况不在列表中，则跳过
             # print(f"  - 工况ID {case_id} 不在指定列表中，跳过该工况。")
             continue
         # ----------------------------------------------
