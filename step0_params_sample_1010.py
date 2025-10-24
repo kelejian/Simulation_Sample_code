@@ -550,8 +550,8 @@ def sample_restraint_params(filename, new_filename,  case_ids, n_samples=None, s
 
     return new_filename
 
-distribution_file = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1023.csv'
-new_filename = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1023_V2.csv'
+distribution_file = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1024.csv'
+new_filename = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1024_V2.csv'
 
 # 读取distribution_file中，is_pulse_ok为TRUE、且'occupant_type'还没有值的的case_id列，转为list，这部分作为填充的case_ids;
 if distribution_file.endswith('.csv'):
@@ -564,7 +564,10 @@ if distribution_file.endswith('.npz'):
 
 ###################################################################################################################################################
 # resample逻辑
-case_ids_to_fill_ori = pd.read_csv(r'E:\课题组相关\理想项目\仿真数据库相关\distribution\resample_before1023.csv', header=None).iloc[:, 0].dropna().astype(int).to_list()
+case_ids_to_fill_ori = pd.read_csv(r'E:\课题组相关\理想项目\仿真数据库相关\distribution\resample_1024.csv', header=None).iloc[:, 0].dropna().astype(int).to_list()
+# 去重
+case_ids_to_fill_ori = list(set(case_ids_to_fill_ori))
+print(f"原始需要填充的case_id数量: {len(case_ids_to_fill_ori)}")
 # 只选择'is_injury_ok'！=True的case_id和'is_pulse_ok'==True的case_id,以及occupant_type为1/2/3之一时进行填充
 case_ids_to_fill = [cid for cid in case_ids_to_fill_ori if df.loc[df['case_id'] == cid, 'is_pulse_ok'].values[0] == True and df.loc[df['case_id'] == cid, 'is_injury_ok'].values[0] != True and df.loc[df['case_id'] == cid, 'occupant_type'].values[0] in [1, 2, 3]]
 print(f"被过滤掉的case_id: {set(case_ids_to_fill_ori) - set(case_ids_to_fill)}")
@@ -573,6 +576,6 @@ print(f"被过滤掉的case_id: {set(case_ids_to_fill_ori) - set(case_ids_to_fil
 print(f"需要填充约束系统参数的case_id数量: {len(case_ids_to_fill)}")
 # print(f"部分case_id示例（开头和结尾）: {case_ids_to_fill[:10]} ... {case_ids_to_fill[-10:]}")
 
-sample_restraint_params(filename=distribution_file, new_filename=new_filename, case_ids=case_ids_to_fill, skip_points=31000, seed=20251024)
+sample_restraint_params(filename=distribution_file, new_filename=new_filename, case_ids=case_ids_to_fill, skip_points=32000, seed=20251024)
 
 # %%

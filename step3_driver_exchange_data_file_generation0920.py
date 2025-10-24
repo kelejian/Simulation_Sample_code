@@ -24,6 +24,7 @@ OUTPUT_DIR = r'I:\000 LX\dataset0715\03\主驾output_vars_resample_before1023'
 # 指定case_id列表（可选），如果不指定则处理对应目录下所有符合条件的文件
 CASE_ID_LIST = None
 CASE_ID_LIST = pd.read_csv(r'I:\000 LX\dataset0715\03\resample_before1023.csv', header=None).iloc[:, 0].dropna().astype(int).to_list()
+CASE_ID_LIST = list(set(CASE_ID_LIST))  # 去重
 # --- 代码主体 ---
 
 def generate_var_files():
@@ -85,7 +86,7 @@ def generate_var_files():
         if case_id not in data.index:
             print(f"  - !!警告：工况ID {case_id} 在参数文件中未找到，跳过该工况。")
             continue
-        if data.loc[case_id, 'is_driver'] != 1:
+        if data.loc[case_id, 'is_driver_side'] != 1:
             # print(f"  - 工况ID {case_id} 非主驾工况，跳过该工况。")
             continue
         

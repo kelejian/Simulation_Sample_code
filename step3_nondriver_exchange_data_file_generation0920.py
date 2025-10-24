@@ -23,6 +23,7 @@ NON_DRIVER_OFFSET = 50000  # 副驾工况ID相对于主驾工况ID的偏移量
 # 指定case_id列表（可选），如果不指定则处理对应目录下所有符合条件的文件
 # CASE_ID_LIST = pd.read_csv(r'I:\000 LX\dataset0715\03\resample_before1023.csv', header=None).iloc[:, 0].dropna().astype(int).to_list()
 # CASE_ID_LIST = [cid - NON_DRIVER_OFFSET for cid in CASE_ID_LIST]  # 转换为主驾工况ID列表
+# CASE_ID_LIST = list(set(CASE_ID_LIST))  # 去重
 CASE_ID_LIST = None
 # --- 代码主体 ---
 
@@ -87,7 +88,7 @@ def generate_var_files():
         if None_driver_case_id not in data.index:
             print(f"  - !!警告：副驾工况ID {None_driver_case_id} 在参数文件中未找到，跳过该工况。")
             continue
-        if data.loc[None_driver_case_id, 'is_driver'] != 0:
+        if data.loc[None_driver_case_id, 'is_driver_side'] != 0:
             # print(f"  - 工况ID {case_id} 对应的副驾工况ID {None_driver_case_id} 非副驾工况，跳过该工况。")
             continue
         # 跳过碰撞波形数据有问题的工况(is_pulse_ok=False)
