@@ -861,9 +861,9 @@ elif new_distribution_path.endswith('.csv'):
 
 # %% ex.读取resample.csv，获取需要修改采样值的case_id列表，增加座椅前后位置sp
 import pandas as pd
-resample_path = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\resample_1024.csv'
-distribution_path = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1024_V2.csv'
-new_distribution_path = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1024_V3.csv'
+resample_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\resample_1026.csv'
+distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1024_V3.csv'
+new_distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1025.csv'
 # 读取distribution文件
 if distribution_path.endswith('.npz'):
     distribution_npz = np.load(distribution_path, allow_pickle=True)
@@ -941,11 +941,11 @@ for occupant_type in occupant_types:
     plt.show()
 print(f"Total cases updated sp: {num}")
 # 保存更新后的distribution文件
-# if new_distribution_path.endswith('.npz'):
-#     np.savez(new_distribution_path, **{col: distribution_df[col].values for col in distribution_df.columns})
-# elif new_distribution_path.endswith('.csv'):
-#     distribution_df.to_csv(new_distribution_path, index=False)
-#     print("Updated distribution file with new sp values has been saved.")
+if new_distribution_path.endswith('.npz'):
+    np.savez(new_distribution_path, **{col: distribution_df[col].values for col in distribution_df.columns})
+elif new_distribution_path.endswith('.csv'):
+    distribution_df.to_csv(new_distribution_path, index=False)
+    print("Updated distribution file with new sp values has been saved.")
 
 # %%
 
