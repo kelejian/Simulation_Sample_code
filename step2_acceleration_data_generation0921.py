@@ -140,8 +140,8 @@ for file in path_list:
         bad_case_ids_list.append(case_id)
         continue
 
-    # 只读取需要的列，减少内存占用和读取时间
-    usecols = [0, 1, 2, 3, 17, 19, 37]  # 只读取需要的列：时间、xyz位置、vx、vy、omg_z
+    # 只读取需要的列：时间、该node的xyz方向位移、x方向速度vx、y方向速度vy、绕z轴角速度omg_z
+    usecols = [0, 1, 2, 3, 17, 19, 37]  
     data = pd.read_excel(os.path.join(xls_route, file), engine='openpyxl', usecols=usecols)
     data_values = data.values  # 转换为numpy数组提高访问速度
     
