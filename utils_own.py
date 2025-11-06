@@ -782,6 +782,290 @@ print(f"对于 overlap={overlap}, angle={wall_theta_deg}°:")
 print(f"计算得到的墙中心坐标为: ({wall_center_x} mm, {wall_center_y} mm)")
 print(f"计算得到的墙偏移量为: x_offset = {x_offset:.4f} m, y_offset = {y_offset:.4f} m")
 
+# %% 绘制损伤标签值分布直方图（含统计信息）及统计信息
+"""
+读取 distribution 文件，筛选有效数据 (is_pulse_ok & is_injury_ok)，
+并为三个损伤指标 (HIC, Dmax, Nij) 绘制概率密度直方图 (含KDE)。
+图表将包含关键统计数据和 AIS 等级分界阈值。
+"""
+import warnings
+warnings.filterwarnings('ignore')
+import os
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy.stats import skew, kurtosis
+
+from AIS_cal import AIS_cal_head, AIS_cal_chest, AIS_cal_neck
+
+# --- 1. 配置区 ---
+# 设置中文字体和负号显示
+plt.rcParams['mathtext.default'] = 'regular'  # 使用常规字体渲染数学文本
+plt.rcParams['font.sans-serif'] = ['SimHei']
+plt.rcParams['axes.unicode_minus'] = False
+
+# 1.1) distribution 文件路径
+DISTRIBUTION_FILE = r"E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1106.csv" 
+# 1.2) 图表保存目录
+OUTPUT_DIR = r"E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\代码\injury_distribution_plots"
+if not os.path.exists(OUTPUT_DIR):
+    os.makedirs(OUTPUT_DIR)
+
+# 1.3) 用于查找阈值的参数
+THRESHOLDS_PROB = {
+    'HIC': 0.15,  #
+    'Dmax': 0.20, #
+    'Nij': 0.17   #
+}
+# --- 结束配置 ---
+
+def load_and_filter_data(file_path):
+    """
+    加载并筛选 distribution 文件。
+    (逻辑基于 utils/data_package.py)
+    """
+    print(f"正在加载数据: {file_path}")
+    if file_path.endswith('.csv'):
+        try:
+            distribution_df = pd.read_csv(file_path)
+        except Exception as e:
+            print(f"读取 CSV 文件时出错: {e}")
+            return None
+    elif file_path.endswith('.npz'):
+        try:
+            distribution_npz = np.load(file_path, allow_pickle=True)
+            distribution_df = pd.DataFrame({
+                key: distribution_npz[key] for key in distribution_npz.files
+            })
+        except Exception as e:
+            print(f"读取 NPZ 文件时出错: {e}")
+            return None
+    else:
+        print(f"错误: 不支持的文件格式 {file_path}")
+        return None
+
+    # 检查必需的列
+    required_cols = ['is_pulse_ok', 'is_injury_ok', 'HIC15', 'Dmax', 'Nij']
+    if not all(col in distribution_df.columns for col in required_cols):
+        print(f"错误: 文件中缺少必需的列。需要: {required_cols}")
+        return None
+
+    # 筛选 is_pulse_ok 和 is_injury_ok 均为 True 的行
+    filtered_df = distribution_df[
+        (distribution_df['is_pulse_ok'] == True) & 
+        (distribution_df['is_injury_ok'] == True)
+    ].copy() # 使用 .copy() 避免 SettingWithCopyWarning
+    
+    print(f"数据加载完成。总行数: {len(distribution_df)}, 筛选后行数: {len(filtered_df)}")
+    
+    # 重命名 HIC15 为 HIC 以方便处理
+    if 'HIC15' in filtered_df.columns:
+        filtered_df.rename(columns={'HIC15': 'HIC'}, inplace=True)
+        
+    return filtered_df
+
+def find_ais_thresholds(calc_function, max_val, step=0.1):
+    """
+    通过数值方法动态查找 AIS 等级变化的阈值点。
+    """
+    # 创建一个测试值范围
+    test_values = np.arange(0, max_val + step, step)
+    # 计算所有测试值的 AIS 等级
+    ais_levels = calc_function(test_values)
+    
+    # 查找 AIS 等级发生变化的位置
+    # np.diff 会计算 (ais[i+1] - ais[i])
+    # np.where(np.diff(ais_levels) > 0) 找到所有 ais_levels 增加的位置的索引
+    change_indices = np.where(np.diff(ais_levels) > 0)[0]
+    
+    thresholds = {}
+    for idx in change_indices:
+        # 变化后的 AIS 等级
+        level = ais_levels[idx + 1]
+        # 发生变化时的损伤值
+        value = test_values[idx + 1]
+        
+        # 确保我们只记录每个等级的第一个阈值
+        if level not in thresholds:
+            thresholds[level] = value
+            
+    return thresholds
+
+def plot_injury_distribution(data_series, title, xlabel, thresholds, output_path):
+    """
+    绘制单个损伤指标的概率密度直方图、KDE、统计数据和 AIS 阈值。
+    """
+    print(f"正在绘制: {title}")
+    
+    plt.figure(figsize=(14, 8))
+    
+    # 1. 绘制直方图和 KDE
+    ax = sns.histplot(data_series, kde=True, stat="density", 
+                      bins=50, 
+                      line_kws={'linewidth': 2.5, 'color': 'red', 'alpha': 0.8},
+                      alpha=0.6)
+    
+    plt.title(f"'{title}' 概率密度分布", fontsize=18)
+    plt.xlabel(xlabel, fontsize=14)
+    plt.ylabel("概率密度", fontsize=14)
+    plt.grid(True, linestyle='--', alpha=0.5)
+    # 数字刻度大小
+    plt.xticks(fontsize=16)
+    plt.yticks(fontsize=16)
+    
+    # 2. 计算统计数据
+    # 根据title判断损伤类型，用于调用相应的AIS计算函数
+    is_nij = 'Nij' in title or 'Nij' in xlabel
+    is_dmax = 'Dmax' in title or 'Dmax' in xlabel
+    is_hic = 'HIC' in title or 'HIC' in xlabel
+    
+    # 计算各AIS等级的样本数量
+    if is_hic:
+        ais_levels = AIS_cal_head(data_series.values, threshold=THRESHOLDS_PROB['HIC'])
+    elif is_dmax:
+        ais_levels = AIS_cal_chest(data_series.values, threshold=THRESHOLDS_PROB['Dmax'])
+    elif is_nij:
+        ais_levels = AIS_cal_neck(data_series.values, threshold=THRESHOLDS_PROB['Nij'])
+    else:
+        ais_levels = None
+    
+    # 统计各等级数量
+    ais_counts_text = ""
+    if ais_levels is not None:
+        unique_levels = sorted(np.unique(ais_levels))
+        ais_counts_text = "\nAIS 等级分布:\n"
+        for level in unique_levels:
+            count = np.sum(ais_levels == level)
+            percentage = (count / len(ais_levels)) * 100
+            ais_counts_text += f"  AIS {int(level)}: {count} ({percentage:.1f}%)\n"
+    
+    stats_text = (
+        f"统计数据:\n"
+        f"-------------------\n"
+        # f"  总样本数 = {len(data_series)}\n"
+        f"  均值 = {data_series.mean():.2f}\n"
+        f"  标准差 = {data_series.std():.2f}\n"
+        f"  偏度 = {skew(data_series):.2f}\n"
+        f"  超额峰度 = {kurtosis(data_series):.2f}\n"
+        f"  中位数 = {data_series.median():.2f}\n"
+        f"  最小值 = {data_series.min():.2f}\n"
+        f"  最大值 = {data_series.max():.2f}\n"
+        f"-------------------"
+        f"{ais_counts_text}"
+    )
+    
+    # 3. 将统计数据添加到图表
+    plt.text(0.98, 0.98, stats_text, 
+             transform=ax.transAxes, 
+             fontsize=14,  # 稍微减小字体以容纳更多内容
+             verticalalignment='top', 
+             horizontalalignment='right', 
+             bbox=dict(boxstyle='round,pad=0.5', fc='wheat', alpha=0.7))
+    
+    # 4. 绘制 AIS 阈值竖线
+    try:
+        kde_line = ax.get_lines()[0]
+        kde_x, kde_y = kde_line.get_data()
+        
+        _, y_max_plot = ax.get_ylim()
+        
+        colors = ['gray', 'green', 'orange', 'red', 'darkred', 'purple']
+                
+        for i, (level, value) in enumerate(thresholds.items()):
+            if value > data_series.max():
+                continue
+                
+            color = colors[i % len(colors)]
+            
+            y_intersect = np.interp(value, kde_x, kde_y)
+            ymax_ratio = y_intersect / y_max_plot
+            
+            ax.axvline(x=value, color=color, linestyle='--', 
+                       linewidth=2, ymax=ymax_ratio, alpha=0.9)
+            
+            # 根据损伤类型选择小数位数
+            if is_nij:
+                label_text = f" AIS {level}\n ({value:.2f})"
+            elif is_dmax:
+                label_text = f" AIS {level}\n ({value:.1f})"
+            elif is_hic:
+                label_text = f" AIS {level}\n ({int(value)})"
+            else:
+                label_text = f" AIS {level}\n ({value:.2f})"
+                
+            ax.text(value, y_intersect + (y_max_plot * 0.01), label_text, 
+                    color=color, ha='center', fontsize=14, 
+                    bbox=dict(facecolor='white', alpha=0.5, edgecolor='none', pad=0.1))
+
+    except Exception as e:
+        print(f"  警告: 绘制 KDE 阈值线时出错: {e}")
+
+    # 5. 保存图表
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150)
+    plt.close()
+    print(f"  图表已保存至: {output_path}")
+
+if __name__ == "__main__":
+    # 确保输出目录存在
+    os.makedirs(OUTPUT_DIR, exist_ok=True) 
+    # 1. 加载和筛选数据
+    df = load_and_filter_data(DISTRIBUTION_FILE)  
+    if df is not None and not df.empty:    
+        # 2. 动态查找 AIS 阈值
+        print("\n正在查找 AIS 阈值...")
+        hic_thresholds = find_ais_thresholds(
+            lambda x: AIS_cal_head(x, threshold=THRESHOLDS_PROB['HIC']), 
+            max_val=df['HIC'].max(), 
+            step=1
+        )
+        dmax_thresholds = find_ais_thresholds(
+            lambda x: AIS_cal_chest(x, threshold=THRESHOLDS_PROB['Dmax']), 
+            max_val=df['Dmax'].max(), 
+            step=0.1
+        )
+        nij_thresholds = find_ais_thresholds(
+            lambda x: AIS_cal_neck(x, threshold=THRESHOLDS_PROB['Nij']), 
+            max_val=df['Nij'].max(), 
+            step=0.01
+        )
+        
+        print(f"  HIC 阈值: {hic_thresholds}")
+        print(f"  Dmax 阈值: {dmax_thresholds}")
+        print(f"  Nij 阈值: {nij_thresholds}")
+        
+        # 3. 绘制并保存图表
+        print("\n开始绘制图表...")
+        
+        plot_injury_distribution(
+            df['HIC'],
+            "头部损伤 (HIC)",
+            "HIC 值",
+            hic_thresholds,
+            os.path.join(OUTPUT_DIR, "distribution_HIC.png")
+        )     
+        plot_injury_distribution(
+            df['Dmax'],
+            "胸部损伤 (Dmax)",
+            "Dmax (mm)",
+            dmax_thresholds,
+            os.path.join(OUTPUT_DIR, "distribution_Dmax.png")
+        )    
+        plot_injury_distribution(
+            df['Nij'],
+            "颈部损伤 (Nij)",
+            "Nij 值",
+            nij_thresholds,
+            os.path.join(OUTPUT_DIR, "distribution_Nij.png")
+        )
+        print("\n" + "="*50)
+        print("所有图表绘制完成。")
+        print(f"输出目录: {os.path.abspath(OUTPUT_DIR)}")
+        print("="*50)
+        
+    else:
+        print("未能加载或筛选数据，程序终止。")
 # %% 
-# %% 
+# %%
 # %%
