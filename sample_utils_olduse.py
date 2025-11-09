@@ -1,8 +1,8 @@
 # %% 为ditribution文件添加几个手动指定的case
 import numpy as np
 import pandas as pd
-distribution_path = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1001.csv'
-new_distribution_path = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1006.csv'
+distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1106.csv'
+new_distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1108.csv'
 # 读取distribution文件
 if distribution_path.endswith('.npz'):
     distribution_npz = np.load(distribution_path, allow_pickle=True)
@@ -16,24 +16,64 @@ elif distribution_path.endswith('.csv'):
 else:
     raise ValueError("Unsupported distribution file format. Use .csv or .npz")
 # 手动指定的case列表及对应参数。其余参数均为NaN
-params_add = {
-    'case_id': [10001, 10002, 10003, 10004],
-    'have_run': [True, True, True, True],
-    'impact_velocity': [30.0, 40.0, 50.0, 60.48],
-    'impact_angle': [0,0,0,0],
-    'overlap': [1.0,1.0,1.0,1.0],
+# 角度列表,从20度到45度，间隔1
+angle_lis1 = list(range(20, 46, 1))
+caseid_lis1 = [9001 + i for i in range(len(angle_lis1))]
+velocity_lis1 = [35.0] * len(angle_lis1)
+overlap_lis1 = [-0.65] * len(angle_lis1)
+is_driver_side_lis1 = [1] * len(angle_lis1)
+have_run_lis1 = [False] * len(angle_lis1)
+# 重叠率列表，从-0.8到-0.55，间隔0.01
+overlap_lis2 = np.arange(-0.8, -0.54, 0.01).tolist()
+caseid_lis2 = [caseid_lis1[-1]+1 + i for i in range(len(overlap_lis2))]
+velocity_lis2 = [40.0] * len(overlap_lis2)
+angle_lis2 = [35.0] * len(overlap_lis2)
+is_driver_side_lis2 = [1] * len(overlap_lis2)
+have_run_lis2 = [False] * len(overlap_lis2)
+
+params_add_driver_side = {
+    'case_id': caseid_lis1 + caseid_lis2,
+    'impact_velocity': velocity_lis1 + velocity_lis2,
+    'impact_angle': angle_lis1 + angle_lis2,
+    'overlap': overlap_lis1 + overlap_lis2,
+    'is_driver_side': is_driver_side_lis1 + is_driver_side_lis2,
+    'have_run': have_run_lis1 + have_run_lis2,
 }
+is_driver_side_lis_no = [0]*(len(caseid_lis1)+len(caseid_lis2))
+caseid_lis_no = [caseid + 50000 for caseid in (caseid_lis1 + caseid_lis2)]
+params_add_driver_side_no = {
+    'case_id': caseid_lis_no,
+    'impact_velocity': velocity_lis1 + velocity_lis2,
+    'impact_angle': angle_lis1 + angle_lis2,
+    'overlap': overlap_lis1 + overlap_lis2,
+    'is_driver_side': is_driver_side_lis_no,
+    'have_run': have_run_lis1 + have_run_lis2,
+}
+# 合并两个字典为:params_add
+params_add = {}
+for key in params_add_driver_side.keys():
+    params_add[key] = params_add_driver_side[key] + params_add_driver_side_no[key]
+
 # 创建DataFrame
 df_add = pd.DataFrame(params_add).set_index('case_id', drop=False)
-# 将手动指定的参数添加到distribution_df的末尾
-distribution_df = pd.concat([distribution_df, df_add], ignore_index=True)
+# 将手动指定的参数添加到distribution_df中。如果已有对应case_id，如果have_run为True则跳过，否则直接替换掉
+for case_id, row in df_add.iterrows():
+    if case_id in distribution_df.index:
+        if distribution_df.at[case_id, 'have_run']:
+            print(f"Case {case_id} already exists and have_run is True, skipping...")
+            continue
+    distribution_df.loc[case_id] = row
+    print(f"Added/Updated case {case_id} to distribution DataFrame.")
+
 print(f"Added {len(df_add)} manual cases to distribution DataFrame.")
+
+
 # 保存更新后的distribution文件
 if new_distribution_path.endswith('.npz'):
     np.savez(new_distribution_path, **{col: distribution_df[col].values for col in distribution_df.columns})
 elif new_distribution_path.endswith('.csv'):
     distribution_df.to_csv(new_distribution_path, index=False)
-    print("Updated distribution file with delta_v has been saved.")
+    print("Updated distribution file has been saved.")
 
 # %% distribution.npz转换为表格，包含中文参数名
 import numpy as np
@@ -186,8 +226,8 @@ new_df.to_csv(new_name, index=False)
 # %% 对比两个csv文件内容的差异
 import pandas as pd
 import numpy as np
-file1 = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1018.csv'
-file2 = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1018_V6.csv'
+file1 = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1106.csv'
+file2 = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1108.csv'
 
 df1 = pd.read_csv(file1)
 df2 = pd.read_csv(file2)
