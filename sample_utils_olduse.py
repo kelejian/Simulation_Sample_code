@@ -1,8 +1,8 @@
 # %% 为ditribution文件添加几个手动指定的case
 import numpy as np
 import pandas as pd
-distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1106.csv'
-new_distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1108.csv'
+distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1109.csv'
+new_distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1110.csv'
 # 读取distribution文件
 if distribution_path.endswith('.npz'):
     distribution_npz = np.load(distribution_path, allow_pickle=True)
@@ -16,38 +16,63 @@ elif distribution_path.endswith('.csv'):
 else:
     raise ValueError("Unsupported distribution file format. Use .csv or .npz")
 # 手动指定的case列表及对应参数。其余参数均为NaN
-# 角度列表,从20度到45度，间隔1
-angle_lis1 = list(range(20, 46, 1))
-caseid_lis1 = [9001 + i for i in range(len(angle_lis1))]
-velocity_lis1 = [35.0] * len(angle_lis1)
-overlap_lis1 = [-0.65] * len(angle_lis1)
-is_driver_side_lis1 = [1] * len(angle_lis1)
-have_run_lis1 = [False] * len(angle_lis1)
-# 重叠率列表，从-0.8到-0.55，间隔0.01
-overlap_lis2 = np.arange(-0.8, -0.54, 0.01).tolist()
+# 重叠率列表,从0.45到0.65，间隔0.01；caseid从8563开始
+overlap_lis1 = np.arange(0.45, 0.66, 0.01).tolist()
+caseid_lis1 = [8563 + i for i in range(len(overlap_lis1))]
+velocity_lis1 = [36.0] * len(overlap_lis1)
+angle_lis1 = [-30.0] * len(overlap_lis1)
+is_driver_side_lis1 = [1] * len(overlap_lis1)
+have_run_lis1 = [False] * len(overlap_lis1)
+
+# 重叠率列表，从-0.85到-0.64，间隔0.01
+overlap_lis2 = np.arange(-0.85, -0.64, 0.01).tolist()
 caseid_lis2 = [caseid_lis1[-1]+1 + i for i in range(len(overlap_lis2))]
-velocity_lis2 = [40.0] * len(overlap_lis2)
-angle_lis2 = [35.0] * len(overlap_lis2)
+velocity_lis2 = [42.0] * len(overlap_lis2)
+angle_lis2 = [30.0] * len(overlap_lis2)
 is_driver_side_lis2 = [1] * len(overlap_lis2)
 have_run_lis2 = [False] * len(overlap_lis2)
 
+# 增加若干45°，变化重叠率的case
+overlap_lis3 = np.arange(-0.6, -0.39, 0.01).tolist() # 从-0.6到-0.4
+caseid_lis3 = [caseid_lis2[-1]+1 + i for i in range(len(overlap_lis3))]
+velocity_lis3 = [32.0] * len(overlap_lis3)
+angle_lis3 = [45.0] * len(overlap_lis3)
+is_driver_side_lis3 = [1] * len(overlap_lis3)
+have_run_lis3 = [False] * len(overlap_lis3)
+
+# 增加若干-45°，变化重叠率的case
+overlap_lis4 = np.arange(0.4, 0.61, 0.01).tolist() # 从0.4到0.6
+caseid_lis4 = [caseid_lis3[-1]+1 + i for i in range(len(overlap_lis4))]
+velocity_lis4 = [32.0] * len(overlap_lis4)
+angle_lis4 = [-45.0] * len(overlap_lis4)
+is_driver_side_lis4 = [1] * len(overlap_lis4)
+have_run_lis4 = [False] * len(overlap_lis4)
+
+# 合并所有列表为一个lis
+overlap_lis = overlap_lis1 + overlap_lis2 + overlap_lis3 + overlap_lis4
+caseid_lis = caseid_lis1 + caseid_lis2 + caseid_lis3 + caseid_lis4
+velocity_lis = velocity_lis1 + velocity_lis2 + velocity_lis3 + velocity_lis4
+angle_lis = angle_lis1 + angle_lis2 + angle_lis3 + angle_lis4
+is_driver_side_lis = is_driver_side_lis1 + is_driver_side_lis2 + is_driver_side_lis3 + is_driver_side_lis4
+have_run_lis = have_run_lis1 + have_run_lis2 + have_run_lis3 + have_run_lis4
+
 params_add_driver_side = {
-    'case_id': caseid_lis1 + caseid_lis2,
-    'impact_velocity': velocity_lis1 + velocity_lis2,
-    'impact_angle': angle_lis1 + angle_lis2,
-    'overlap': overlap_lis1 + overlap_lis2,
-    'is_driver_side': is_driver_side_lis1 + is_driver_side_lis2,
-    'have_run': have_run_lis1 + have_run_lis2,
+    'case_id': caseid_lis,
+    'impact_velocity': velocity_lis,
+    'impact_angle': angle_lis,
+    'overlap': overlap_lis,
+    'is_driver_side': is_driver_side_lis,
+    'have_run': have_run_lis,
 }
-is_driver_side_lis_no = [0]*(len(caseid_lis1)+len(caseid_lis2))
-caseid_lis_no = [caseid + 50000 for caseid in (caseid_lis1 + caseid_lis2)]
+is_driver_side_lis_no = [0]*len(caseid_lis)
+caseid_lis_no = [caseid + 50000 for caseid in caseid_lis]
 params_add_driver_side_no = {
     'case_id': caseid_lis_no,
-    'impact_velocity': velocity_lis1 + velocity_lis2,
-    'impact_angle': angle_lis1 + angle_lis2,
-    'overlap': overlap_lis1 + overlap_lis2,
+    'impact_velocity': velocity_lis,
+    'impact_angle': angle_lis,
+    'overlap': overlap_lis,
     'is_driver_side': is_driver_side_lis_no,
-    'have_run': have_run_lis1 + have_run_lis2,
+    'have_run': have_run_lis,
 }
 # 合并两个字典为:params_add
 params_add = {}

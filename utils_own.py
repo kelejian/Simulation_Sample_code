@@ -141,7 +141,7 @@ def plot_acceleration_waveforms(case_ids, save_plots=False, show_plots=True, dat
 
 
 # 加载工况参数
-case_params_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1010.csv'
+case_params_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1109.csv'
 if not os.path.exists(case_params_path):
     print(f"Error: Case parameters file not found at {case_params_path}")
     exit()
@@ -158,9 +158,9 @@ with open(case_params_path, 'r') as f:
 # 只选取is_pulse_ok == True的case
 params_df = params_df[params_df['is_pulse_ok'] == True]
 
-example_case_ids = list(np.random.choice(np.arange(1, 3401), size=20, replace=False))  # 示例 case_id 列表
-data_dir = r'F:\VCS_acc_data\acc_data_before0929_3163'
-save_dir = r'F:\VCS_acc_data\acc_data_before0929_3163\acceleration_plots'
+example_case_ids = list(np.random.choice(np.arange(9001, 9054), size=51, replace=False))  # 示例 case_id 列表
+data_dir = r'G:\VCS_acc_data\acc_data_1103_143'
+save_dir = r'G:\VCS_acc_data\acc_data_1103_143\acceleration_plots'
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 plot_acceleration_waveforms(example_case_ids, save_plots=True, show_plots=False, data_dir=data_dir, params_df=params_df, save_dir=save_dir)
