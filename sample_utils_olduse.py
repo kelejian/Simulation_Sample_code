@@ -742,4 +742,48 @@ elif new_distribution_path.endswith('.csv'):
 
 
 
-# %% 
+# %% 检查distribution文件中是否存在is_driver_side相同，速度相差不到0.01 kph，ll1相差不到0.01,,ll2相差不到0.01的case
+import numpy as np
+import pandas as pd
+distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1111.csv'
+# 读取distribution文件
+if distribution_path.endswith('.npz'):
+    distribution_npz = np.load(distribution_path, allow_pickle=True)
+    distribution_df = pd.DataFrame({
+            key: distribution_npz[key]
+            for key in distribution_npz.files
+        }).set_index('case_id', drop=False)
+elif distribution_path.endswith('.csv'):
+    distribution_df = pd.read_csv(distribution_path)
+    distribution_df.set_index('case_id', inplace=True, drop=False)
+else:
+    raise ValueError("Unsupported distribution file format. Use .csv or .npz")
+# 检查重复条件
+tolerance = 0.01
+duplicates = []
+
+# 对数值列进行分组,只比较可能相似的案例
+for is_driver in distribution_df['is_driver_side'].unique():
+    subset = distribution_df[distribution_df['is_driver_side'] == is_driver]
+    
+    # 使用向量化计算找出近似相等的案例
+    for idx1 in range(len(subset)):
+        row1 = subset.iloc[idx1]
+        # 只检查后续的行
+        remaining = subset.iloc[idx1+1:]
+        
+        # 向量化比较
+        mask = (
+            (abs(remaining['impact_velocity'] - row1['impact_velocity']) < tolerance) &
+            (abs(remaining['ll1'] - row1['ll1']) < tolerance) &
+            (abs(remaining['ll2'] - row1['ll2']) < tolerance)
+        )
+        
+        for idx2 in remaining[mask].index:
+            duplicates.append((row1['case_id'], subset.loc[idx2, 'case_id']))
+# 输出结果
+if duplicates:
+    print(f"Found {len(duplicates)} duplicate case pairs based on the criteria:")
+    for case1, case2 in duplicates:
+        print(f"  - Case {case1} and Case {case2}")
+
