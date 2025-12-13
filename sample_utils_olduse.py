@@ -787,3 +787,91 @@ if duplicates:
     for case1, case2 in duplicates:
         print(f"  - Case {case1} and Case {case2}")
 
+# %% 6. 清洗旧版distribution文件，为新的MADYMO采样做准备（删除pp/plp，清空约束系统参数和损伤值）
+import pandas as pd
+import numpy as np
+import os
+
+def clean_distribution_for_madymo_resampling(filepath, new_filepath):
+    """
+    读取旧版distribution文件，执行以下操作以适配新的MADYMO采样需求：
+    1. 删除不再需要的参数列: pp, plp
+    2. 清空(置为NaN)所有MADYMO输入参数: occupant_type, ll1, ll2, btf, lla_status, llattf, dz, ptf, aft, aav_status, ttf, sp, recline_angle
+    3. 清空(置为NaN)所有损伤结果: HIC15, Dmax, Nij
+    4. 清空(置为NaN)损伤状态标志: is_injury_ok
+    5. 严格保留VCS相关数据: case_id, impact_velocity, overlap, delta_v等
+    """
+    print(f"=== 开始清洗distribution文件: {filepath} ===")
+    
+    # 1. 读取文件
+    try:
+        if filepath.endswith('.npz'):
+            data = np.load(filepath, allow_pickle=True)
+            # 使用allow_pickle=True以确保能正确读取可能存在的非数值列
+            df = pd.DataFrame({key: data[key] for key in data.files})
+        elif filepath.endswith('.csv'):
+            df = pd.read_csv(filepath)
+        else:
+            raise ValueError("不支持的文件格式，请使用.npz或.csv")
+    except FileNotFoundError:
+        print(f"错误: 找不到文件 {filepath}")
+        return
+
+    print(f"原始数据维度: {df.shape}")
+    print(f"原始列名: {list(df.columns)}")
+    
+    # 2. 删除不再需要的参数列 (pp, plp)
+    cols_to_drop = ['pp', 'plp']
+    dropped_cols = []
+    for col in cols_to_drop:
+        if col in df.columns:
+            df.drop(columns=[col], inplace=True)
+            dropped_cols.append(col)
+    print(f"已删除列: {dropped_cols}")
+            
+    # 3. 需要清空值的列 (MADYMO输入参数 + 损伤输出 + 标志位)
+    # 注意：这里不清空VCS相关的参数（impact_velocity, impact_angle, overlap）和结果（delta_v等）
+    cols_to_clear = [
+        # 约束系统参数
+        'occupant_type', 'll1', 'll2', 'btf', 
+        'lla_status', 'llattf', 'dz', 
+        'ptf', 'aft', 'aav_status', 'ttf', 
+        'sp', 'recline_angle',
+        # 损伤结果
+        'HIC15', 'Dmax', 'Nij',
+        # 状态标志
+        'is_injury_ok'
+    ]
+    
+    cleared_cols = []
+    for col in cols_to_clear:
+        # 无论列是否存在，都确保其存在并赋值为NaN，为后续采样填充做准备
+        df[col] = np.nan
+        cleared_cols.append(col)
+            
+    print(f"已清空(重置)列值: {len(cleared_cols)} 个参数列已重置")
+
+    # 4. 保存文件
+    # 确保目录存在
+    output_dir = os.path.dirname(new_filepath)
+    if output_dir and not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+        
+    if new_filepath.endswith('.npz'):
+        np.savez_compressed(new_filepath, **{col: df[col].values for col in df.columns})
+    elif new_filepath.endswith('.csv'):
+        # float_format=None 默认会以最高精度保存浮点数，避免截断
+        df.to_csv(new_filepath, index=False)
+        
+    print(f"=== 清洗完成 ===")
+    print(f"结果已保存至: {new_filepath}")
+    print(f"当前列名: {list(df.columns)}")
+    print(f"示例数据(前1行):\n{df.head(1).T}")
+
+if __name__ == '__main__':
+    # 使用示例：请修改为你实际的文件路径
+    old_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1112.csv'
+    new_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1207V0.csv'
+    clean_distribution_for_madymo_resampling(old_path, new_path)
+# %%
+# %%
