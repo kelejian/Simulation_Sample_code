@@ -7,7 +7,7 @@ from datetime import datetime
 
 # --- 1. 核心绘图与分析函数 ---
 
-def plot_waveforms_on_single_figure(loaded_data, condition_str, save_dir):
+def plot_waveforms_on_single_figure(loaded_data, condition_str, save_dir, downsample_factor=100):
     """将多个case的波形绘制在同一张图的三个子图上。"""
     if not loaded_data:
         print("No data to plot.")
@@ -20,9 +20,18 @@ def plot_waveforms_on_single_figure(loaded_data, condition_str, save_dir):
     fig.suptitle(title, fontsize=16, fontweight='bold')
 
     for case_id, data_dict in loaded_data.items():
-        axes[0].plot(data_dict['x']['time'] * 1000, data_dict['x']['ax'], color='blue', alpha=0.3, linewidth=1)
-        axes[1].plot(data_dict['y']['time'] * 1000, data_dict['y']['ay'], color='red', alpha=0.3, linewidth=1)
-        axes[2].plot(data_dict['z']['time'] * 1000, data_dict['z']['az'], color='green', alpha=0.3, linewidth=1)
+        # 降采样以减少内存占用
+        x_time = data_dict['x']['time'].values[::downsample_factor] * 1000
+        x_ax = data_dict['x']['ax'].values[::downsample_factor]
+        y_time = data_dict['y']['time'].values[::downsample_factor] * 1000
+        y_ay = data_dict['y']['ay'].values[::downsample_factor]
+        z_time = data_dict['z']['time'].values[::downsample_factor] * 1000
+        z_az = data_dict['z']['az'].values[::downsample_factor]
+        
+        axes[0].plot(x_time, x_ax, color='blue', alpha=0.3, linewidth=1)
+        axes[1].plot(y_time, y_ay, color='red', alpha=0.3, linewidth=1)
+        axes[2].plot(z_time, z_az, color='green', alpha=0.3, linewidth=1)
+
 
     axes[0].set_title('X-direction Acceleration', fontsize=12)
     axes[0].set_ylabel('Acceleration (m/s²)', fontsize=12)
@@ -250,9 +259,8 @@ def analyze_and_plot_cases_by_condition(params_df, data_dir, output_root_dir, ve
     filtered_df = params_df.query(query_str)
     # ********************************************************************************************************************************************
     # ********************************************************************************************************************************************
-
-    # 只处理have_run为True的case
-    filtered_df = filtered_df[filtered_df['have_run'] == True]
+    # 只处理is_driver_side为1且is_pulse_ok为True的case
+    filtered_df = filtered_df[(filtered_df['is_driver_side'] == 1) & (filtered_df['is_pulse_ok'] == True)]
     # ********************************************************************************************************************************************
     # ********************************************************************************************************************************************
     case_ids_to_process = filtered_df.index.tolist()
@@ -339,9 +347,9 @@ def analyze_and_plot_cases_by_condition(params_df, data_dir, output_root_dir, ve
 if __name__ == "__main__":
     # --- 配置区域 ---
     # 1. 设置路径
-    data_directory = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\acc_data_before0915'
-    case_params_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution_0917.csv'
-    output_root_directory = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\acc_data_before0915\analysis_reports'
+    data_directory = r'G:\VCS_acc_data\acc_data_before1111_6134'
+    case_params_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1112.csv'
+    output_root_directory = r'G:\VCS_acc_data\acc_data_before1111_6134\analysis_reports'
 
     # 2. 定义您想分析的工况范围
     velocity_range = [23, 65]
@@ -352,9 +360,9 @@ if __name__ == "__main__":
     # 格式: {'direction': {'pos': positive_threshold, 'neg': negative_threshold}}
     # 如果某个方向或类型不分析，可以省略对应的键。
     analysis_thresholds = {
-        'x': {'pos': 150, 'neg': -600}, 
-        'y': {'pos': 200, 'neg': -200}, 
-        'z': {'pos': 200, 'neg': -200} 
+        'x': {'pos': 100, 'neg': -600}, 
+        'y': {'pos': 300, 'neg': -300}, 
+        'z': {'pos': 300, 'neg': -300} 
     }
 
     # --- 执行区域 ---
@@ -368,6 +376,7 @@ if __name__ == "__main__":
         # **********************************************************************
         params_df = pd.DataFrame({
         'case_id': all_case_params['case_id'],
+        'is_driver_side': all_case_params['is_driver_side'],
         'have_run': all_case_params['have_run'],
         'is_pulse_ok': all_case_params['is_pulse_ok'],
         'impact_velocity': all_case_params['impact_velocity'],

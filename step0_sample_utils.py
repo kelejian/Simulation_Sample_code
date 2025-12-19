@@ -386,9 +386,9 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
     
     print(f"\n--- 校验总结: {'所有检查均已通过！' if all_checks_passed else '存在未通过的检查项！'} ---\n")
     
-    if not all_checks_passed:
-        print("由于校验失败，将跳过可视化部分。")
-        return verification_results
+    # if not all_checks_passed:
+    #     print("由于校验失败，将跳过可视化部分。")
+    #     return verification_results
     
     print("--- 开始生成可视化图表 ---")
     
@@ -536,8 +536,8 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
 
 if __name__ == '__main__':
 
-    verify_and_visualize_params(r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_test2.csv', flag='VCS', output_dir='VCS_sample_verification_test', param_pairs=[('impact_velocity', 'impact_angle'), ('impact_velocity', 'overlap'), ('impact_angle', 'overlap')])
-    verify_and_visualize_params(r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_test2.csv', flag='MADYMO', output_dir='MADYMO_sample_verification_test',
+    verify_and_visualize_params(r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1112.csv', flag='VCS', output_dir='VCS_sample_verification_test', param_pairs=[('impact_velocity', 'impact_angle'), ('impact_velocity', 'overlap'), ('impact_angle', 'overlap')])
+    verify_and_visualize_params(r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1112.csv', flag='MADYMO', output_dir='MADYMO_sample_verification_test',
     param_pairs=[
             ('ll1', 'll2'),
             ('sp', 'occupant_type'),
