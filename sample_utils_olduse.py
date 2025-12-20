@@ -787,7 +787,96 @@ if duplicates:
     for case1, case2 in duplicates:
         print(f"  - Case {case1} and Case {case2}")
 
-# %% 6. 清洗旧版distribution文件，为新的MADYMO采样做准备（删除pp/plp，清空约束系统参数和损伤值）
+
+# %% ex.读取resample.csv，获取需要修改采样值的case_id列表，增加座椅前后位置sp
+import pandas as pd
+resample_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\resample_1026.csv'
+distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1024_V3.csv'
+new_distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1025.csv'
+# 读取distribution文件
+if distribution_path.endswith('.npz'):
+    distribution_npz = np.load(distribution_path, allow_pickle=True)
+    distribution_df = pd.DataFrame({
+            key: distribution_npz[key]
+            for key in distribution_npz.files
+        }).set_index('case_id', drop=False)
+elif distribution_path.endswith('.csv'):
+    distribution_df = pd.read_csv(distribution_path)
+    distribution_df.set_index('case_id', inplace=True, drop=False)
+else:
+    raise ValueError("Unsupported distribution file format. Use .csv or .npz")
+# resample只有一列，没有表头，去掉空值/nan、去重、转为整数的list
+resample_cases = pd.read_csv(resample_path, header=None).iloc[:, 0].dropna().astype(int).to_list() 
+resample_cases = list(set(resample_cases))  # 去重
+
+print(f"Total case_ids to update sp: {len(resample_cases)}")
+# 三种体型假人各有范围：5%假人:[+10mm, +110mm]；50%假人: [-80mm, +80mm]; 95%假人: [-110mm, +40mm] 向前移动为正，向后移动为负。
+# 先根据三种假人类型，画出resample_cases的各自的sp分布直方图，确认范围合理性
+import matplotlib.pyplot as plt
+import numpy as np
+occupant_types = [1, 2, 3]
+for occupant_type in occupant_types:
+
+    sp_values = distribution_df[(distribution_df['occupant_type'] == occupant_type) & (distribution_df['case_id'].isin(resample_cases))]['sp'].dropna().to_list()
+    plt.figure()
+    plt.hist(sp_values, bins=20, color='blue', edgecolor='black', alpha=0.7)
+    plt.title(f'sp Distribution for occupant_type {occupant_type}')
+    plt.xlabel('sp (mm)')
+    plt.ylabel('Frequency')
+    plt.grid(True, alpha=0.3)
+    plt.show()
+num = 0
+seed = 42
+np.random.seed(seed)
+for case_id in resample_cases:
+    if case_id in distribution_df.index:
+
+        if distribution_df.at[case_id, 'is_injury_ok'] == True:
+            print(f"!Warning: case_id {case_id} has is_injury_ok=True, skipping sp update.")
+            continue
+        if distribution_df.at[case_id, 'is_pulse_ok'] != True:
+            print(f"INFO: case_id {case_id} has is_pulse_ok!=True, skipping sp update.")
+            continue
+        occupant_type = distribution_df.at[case_id, 'occupant_type']
+        old_sp = distribution_df.at[case_id, 'sp']
+        if occupant_type == 1:  # 5%假人
+            # new_sp = np.clip((old_sp + 110) / 2, 10, 110)
+            new_sp = np.random.uniform(40, 85)  
+            num += 1
+        elif occupant_type == 2:  # 50%假人
+            # new_sp = np.clip((old_sp + 80) / 2, -80, 80)
+            new_sp = np.random.uniform(-30, 35)  
+            num += 1
+        elif occupant_type == 3:  # 95%假人
+            # new_sp = np.clip((old_sp + 40) / 2, -110, 40)
+            new_sp = np.random.uniform(-60, 5)  
+            num += 1
+        else:
+            print(f"Error: Unknown occupant_type {occupant_type} for case_id {case_id}. Skipping sp update.")
+            continue
+        distribution_df.at[case_id, 'sp'] = new_sp
+        # print(f"Updated sp for case_id {case_id} to {new_sp:.2f} mm.")
+    else:
+        print(f"Error: case_id {case_id} from resample not found in distribution.")
+# 画出更新后的resample_cases的各自的sp分布直方图，确认范围合理性
+for occupant_type in occupant_types:
+    sp_values = distribution_df[(distribution_df['occupant_type'] == occupant_type) & (distribution_df['case_id'].isin(resample_cases))]['sp'].dropna().to_list()
+    plt.figure()
+    plt.hist(sp_values, bins=20, color='green', edgecolor='black', alpha=0.7)
+    plt.title(f'Updated sp Distribution for occupant_type {occupant_type}')
+    plt.xlabel('sp (mm)')
+    plt.ylabel('Frequency')
+    plt.grid(True, alpha=0.3)
+    plt.show()
+print(f"Total cases updated sp: {num}")
+# 保存更新后的distribution文件
+if new_distribution_path.endswith('.npz'):
+    np.savez(new_distribution_path, **{col: distribution_df[col].values for col in distribution_df.columns})
+elif new_distribution_path.endswith('.csv'):
+    distribution_df.to_csv(new_distribution_path, index=False)
+    print("Updated distribution file with new sp values has been saved.")
+
+# %% 清洗旧版distribution文件，为新的MADYMO采样做准备（删除pp/plp，清空约束系统参数和损伤值）- 1206旧版
 import pandas as pd
 import numpy as np
 import os
@@ -873,5 +962,3 @@ if __name__ == '__main__':
     old_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1112.csv'
     new_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1207V0.csv'
     clean_distribution_for_madymo_resampling(old_path, new_path)
-# %%
-# %%
