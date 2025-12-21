@@ -220,8 +220,8 @@ def process_single_case(base_tree, case_data, case_id, is_driver, ot):
         val_ll2tf_s = raw_llattf / 1000.0
 
     # RA 逻辑 
-    # VALUE = base value + deg2rad(sample - 25)
-    delta_ra_rad = np.deg2rad(raw_ra_deg - 25.0)
+    # VALUE = base value - deg2rad(sample - 25)
+    delta_ra_rad = -np.deg2rad(raw_ra_deg - 25.0)
 
     # DZ 逻辑 
     val_dring_pos = DRING_COORDS_MAP[is_driver][dz_level]
@@ -241,11 +241,11 @@ def process_single_case(base_tree, case_data, case_id, is_driver, ot):
     # 三个关节角度计算（基于更新后的 Seat_X_Disp）
     val_hip, val_knee, val_ankle = calc_joint_angles(ot, Seat_X_Disp)
 
-    # Seat_Back_rotation_Angle = base value + deg2rad[RA采样值 - 25°]
+    # Seat_Back_rotation_Angle = base value - deg2rad[RA采样值 - 25°]
     ra_nodes = root.xpath(".//DEFINE[@VAR_NAME='Seat_Back_rotation_Angle']")
     if ra_nodes:
         base_ra_val = float(ra_nodes[0].attrib['VALUE'])
-        new_ra_val = base_ra_val + delta_ra_rad
+        new_ra_val = base_ra_val + delta_ra_rad # 注意这里是加上 delta，因为 delta 已经是 base - sampled 的结果
         ra_nodes[0].attrib['VALUE'] = f"{new_ra_val:.6f}"
     else:
         print(f"  [Warning] Case {case_id}: Base XML 中未找到变量 Seat_Back_rotation_Angle")
