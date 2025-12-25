@@ -807,7 +807,7 @@ plt.rcParams['font.sans-serif'] = ['SimHei']
 plt.rcParams['axes.unicode_minus'] = False
 
 # 1.1) distribution 文件路径
-DISTRIBUTION_FILE = r"E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1106.csv" 
+DISTRIBUTION_FILE = r"E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1224.csv" 
 # 1.2) 图表保存目录
 OUTPUT_DIR = r"E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\代码\injury_distribution_plots"
 if not os.path.exists(OUTPUT_DIR):
@@ -858,6 +858,12 @@ def load_and_filter_data(file_path):
         (distribution_df['is_injury_ok'] == True)
     ].copy() # 使用 .copy() 避免 SettingWithCopyWarning
     
+    # 进一步筛选50th
+    if 'occupant_type' in filtered_df.columns:
+        filtered_df = filtered_df[filtered_df['occupant_type'] == 2]
+    elif 'OT' in filtered_df.columns:
+        filtered_df = filtered_df[filtered_df['OT'] == 2]
+
     print(f"数据加载完成。总行数: {len(distribution_df)}, 筛选后行数: {len(filtered_df)}")
     
     # 重命名 HIC15 为 HIC 以方便处理

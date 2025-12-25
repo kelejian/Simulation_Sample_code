@@ -3,7 +3,7 @@
 MADYMO XML 自动化生成脚本 (Step 3 - New 1220 Version)
 --------------------------------------------------
 功能：
-1. 读取 distribution_1220.csv 参数矩阵。
+1. 读取 distribution.csv 参数矩阵。
 2. 读取 acc_data 文件夹下的碰撞波形 (X, Y)。
 3. 根据 'base_xml文件参数修改说明-副驾-50th假人-1220.pdf' 的规则，
    修改 Base XML 文件中的 DEFINE 变量和 FUNCTION.XY 表格。
@@ -36,7 +36,7 @@ BASE_XML_PATHS = {
     'DS_50th': os.path.join(BASE_XML_DIR, '主驾-50th假人-base-1220.xml'),
     'DS_95th': os.path.join(BASE_XML_DIR, '主驾-95th假人-base-1220.xml'),
     'PS_5th':  os.path.join(BASE_XML_DIR, '副驾-5th假人-base-1220.xml'),
-    'PS_50th': os.path.join(BASE_XML_DIR, '副驾-50th假人-base-1220.xml'),
+    'PS_50th': os.path.join(BASE_XML_DIR, '副驾-50th假人-base-1221.xml'),
     'PS_95th': os.path.join(BASE_XML_DIR, '副驾-95th假人-base-1220.xml'),
 }
 
