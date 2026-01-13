@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-MADYMO XML 自动化生成脚本 (Step 3 - New 1220 Version)
+MADYMO XML 自动化生成脚本 (Step 3 - 1220 Version)
 --------------------------------------------------
 功能：
 1. 读取 distribution.csv 参数矩阵。
@@ -21,29 +21,33 @@ import copy
 # --- 指定本次运行要生成的 XML 类型 ---
 # 格式: '{驾驶侧}_{假人体型}'
 # 可选: 'DS_5th', 'DS_50th', 'DS_95th', 'PS_5th', 'PS_50th', 'PS_95th'
-XML_TYPE = 'PS_50th'
-
+# =================================*****===================================
+XML_TYPE = 'DS_50th'
+# =================================*****===================================
 # --- 路径配置 ---
 # 请根据实际环境确认以下路径
-BASE_XML_DIR = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\代码\MADYMO_Base_xml文件'
-PARAM_FILE_PATH = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1220.csv'
-PULSE_FILES_DIR = r'G:\VCS_acc_data\acc_data_before1111_6134'
-OUTPUT_DIR = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\代码\output_xml_1220'
+BASE_XML_DIR = r'D:\MADYMO_xml文件'
+# =================================*****===================================
+PARAM_FILE_PATH = r'I:\000 LX\dataset0715\03\distribution_0113.csv'
+# =================================*****===================================
+PULSE_FILES_DIR = r'I:\000 LX\dataset0715\03\acc_data_before1111_6134'
+OUTPUT_DIR = os.path.join(BASE_XML_DIR, XML_TYPE)
 
 # --- Base XML 文件映射 ---
+# =================================*****===================================
 BASE_XML_PATHS = {
     'DS_5th':  os.path.join(BASE_XML_DIR, '主驾-5th假人-base-1220.xml'),
-    'DS_50th': os.path.join(BASE_XML_DIR, '主驾-50th假人-base-1220.xml'),
+    'DS_50th': os.path.join(BASE_XML_DIR, '主驾-50th假人-base-V4-0113.xml'),
     'DS_95th': os.path.join(BASE_XML_DIR, '主驾-95th假人-base-1220.xml'),
-    'PS_5th':  os.path.join(BASE_XML_DIR, '副驾-5th假人-base-1220.xml'),
+    'PS_5th':  os.path.join(BASE_XML_DIR, '副驾-5th假人-base-0104.xml'),
     'PS_50th': os.path.join(BASE_XML_DIR, '副驾-50th假人-base-1221.xml'),
-    'PS_95th': os.path.join(BASE_XML_DIR, '副驾-95th假人-base-1220.xml'),
+    'PS_95th': os.path.join(BASE_XML_DIR, '副驾-95th假人-base-1226.xml'),
 }
-
+# =================================*****===================================
 # --- 常量配置 ---
 NON_DRIVER_OFFSET = 50000  # 副驾工况ID偏移量
 CASE_ID_LIST = None        # 指定特定case_id列表 (None表示处理所有)
-CASE_ID_LIST = [2, 50001, 50004, 50005] # 调试用
+# CASE_ID_LIST = [2, 50001, 50004, 50005] # 调试用
 
 # ==================== 2. 数据映射表 & 辅助函数 ====================
 
@@ -78,47 +82,87 @@ def parse_xml_type(xml_type):
     ot = OT_MAPPING.get(percentile_str, 2)
     return is_driver, ot, percentile_str
 
-def calc_joint_angles(ot, Seat_X_Disp):
+def calc_joint_angles(ot, is_driver, Seat_X_Disp):
     """
     根据xml文件座椅位置 Seat_X_Disp 和 假人类型 OT 计算关节角度 (rad)
     """
-    # 初始化
-    hip, knee, ankle = 0.0, 0.0, 0.0
-    
-    # --- 副驾5th假人 (OT=1) ---
-    if ot == 1:
-        if Seat_X_Disp > 0.06: 
-            hip   = 0.5 * Seat_X_Disp - 0.03     
-            knee  = -3.3429 * Seat_X_Disp - 0.0309
-            ankle = -7.1857 * Seat_X_Disp + 1.0216
-        else: 
-            hip   = 0.0
-            knee  = -0.23
-            ankle = 0.6
+    if is_driver == 0: # 副驾PS
+        # 初始化
+        hip, knee, ankle = 0.0, 0.0, 0.0
 
-    # --- 副驾50th假人 (OT=2) ---
-    elif ot == 2:
-        if Seat_X_Disp > 0.005:
-            hip   = -2.0703 * Seat_X_Disp + 0.1305
-            knee  = 4.7459 * Seat_X_Disp - 0.6046
-            ankle = -2.8728 * Seat_X_Disp + 0.1765
-        else:
-            hip   = 0.13
-            knee  = -0.6
-            ankle = 0.18
+        # --- 副驾5th假人 (OT=1) ---
+        if ot == 1:
+            if Seat_X_Disp > 0.06: 
+                hip   = 0.5 * Seat_X_Disp - 0.03     
+                knee  = -3.3429 * Seat_X_Disp - 0.0309
+                ankle = -7.1857 * Seat_X_Disp + 1.0216
+            else: 
+                hip   = 0.0
+                knee  = -0.23
+                ankle = 0.6
 
-    # --- 副驾95th假人 (OT=3) ---
-    elif ot == 3:
-        if Seat_X_Disp > -0.006:
-            hip   = -1.8182 * Seat_X_Disp + 0.0491        
-            knee  = 4.2 * Seat_X_Disp - 0.38              
-            ankle = -2.7273 * Seat_X_Disp + 0.0056        
-        else:
-            hip   = -0.05
-            knee  = -0.09
-            ankle = 0.6
+        # --- 副驾50th假人 (OT=2) ---
+        elif ot == 2:
+            if Seat_X_Disp > 0.005:
+                hip   = -2.0703 * Seat_X_Disp + 0.1305
+                knee  = 4.7459 * Seat_X_Disp - 0.6046
+                ankle = -2.8728 * Seat_X_Disp + 0.1765
+            else:
+                hip   = 0.13
+                knee  = -0.6
+                ankle = 0.18
+
+        # --- 副驾95th假人 (OT=3) ---
+        elif ot == 3:
+            if Seat_X_Disp > -0.006:
+                hip   = -1.8182 * Seat_X_Disp + 0.0491        
+                knee  = 4.2 * Seat_X_Disp - 0.38              
+                ankle = -2.7273 * Seat_X_Disp + 0.0056        
+            else:
+                hip   = -0.05
+                knee  = -0.09
+                ankle = 0.6
+                
+        return hip, knee, ankle
+                
+    if is_driver == 1: # 主驾DS
+        # 初始化
+        hipL, hipR, ankleL, ankleR, elbow, shoulder, kneeL, kneeR = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        # --- 主驾5th假人 (OT=1) ---
+        if ot == 1:
+            pass
+        # --- 主驾50th假人 (OT=2) ---
+        elif ot == 2:
+            # 肘关节角度 elbow_angle: y = -5.0446x - 0.4672
+            elbow = -5.0446 * Seat_X_Disp - 0.4672
             
-    return hip, knee, ankle
+            # 肩关节角度 shoulder_angle: y = 1.7536x - 0.907
+            shoulder = 1.7536 * Seat_X_Disp - 0.907
+            
+            # 踝关节L角度 ankleL_angle: y = -3.2955x + 0.0937
+            ankleL = -3.2955 * Seat_X_Disp + 0.0937
+            
+            # 踝关节R角度 ankleR_angle: y = 5.1148x - 0.2174
+            ankleR = 5.1148 * Seat_X_Disp - 0.2174
+            
+            # 膝关节L角度 kneeL_angle: y = 5.1148x - 0.2174
+            kneeL = 5.1148 * Seat_X_Disp - 0.2174
+            
+            # 膝关节R角度 kneeR_angle: y = 4.873x - 0.2098
+            kneeR = 4.873 * Seat_X_Disp - 0.2098
+            
+            # 髋关节L角度 hipL_angle: y = -2.3329x + 0.1008
+            hipL = -2.3329 * Seat_X_Disp + 0.1008
+            
+            # 髋关节R角度 hipR_angle: y = -2.2783x + 0.0974
+            hipR = -2.2783 * Seat_X_Disp + 0.0974
+            
+            return hipL, hipR, kneeL, kneeR, ankleL, ankleR, shoulder, elbow
+            
+        # --- 主驾95th假人 (OT=3) ---
+        elif ot == 3:
+            pass
+
 
 def get_pulse_data_string(pulse_dir, driver_case_id, axis):
     """
@@ -221,7 +265,7 @@ def process_single_case(base_tree, case_data, case_id, is_driver, ot):
 
     # RA 逻辑 
     # VALUE = base value - deg2rad(sample - 25)
-    delta_ra_rad = -np.deg2rad(raw_ra_deg - 25.0)
+    delta_ra_rad = -np.deg2rad(raw_ra_deg - 25.0) # 为正值时座椅靠背相对中立位前倾
 
     # DZ 逻辑 
     val_dring_pos = DRING_COORDS_MAP[is_driver][dz_level]
@@ -239,31 +283,55 @@ def process_single_case(base_tree, case_data, case_id, is_driver, ot):
         print(f"  [Warning] Case {case_id}: Base XML 中未找到变量 Seat_X_Disp")
 
     # 三个关节角度计算（基于更新后的 Seat_X_Disp）
-    val_hip, val_knee, val_ankle = calc_joint_angles(ot, Seat_X_Disp)
+    joint_angles = calc_joint_angles(ot, is_driver, Seat_X_Disp)
+    
+    # 根据驾驶侧解包角度值
+    if is_driver == 0:  # 副驾：3个角度 (hip, knee, ankle)
+        val_hip, val_knee, val_ankle = joint_angles
+    else:  # 主驾：8个角度
+        val_hipL, val_hipR, val_kneeL, val_kneeR, val_ankleL, val_ankleR, val_shoulder, val_elbow = joint_angles
 
     # Seat_Back_rotation_Angle = base value - deg2rad[RA采样值 - 25°]
     ra_nodes = root.xpath(".//DEFINE[@VAR_NAME='Seat_Back_rotation_Angle']")
     if ra_nodes:
         base_ra_val = float(ra_nodes[0].attrib['VALUE'])
-        new_ra_val = base_ra_val + delta_ra_rad # 注意这里是加上 delta，因为 delta 已经是 base - sampled 的结果
+        new_ra_val = base_ra_val + delta_ra_rad # 注意这里是加上 delta，因为 delta 已经包含了负号
         ra_nodes[0].attrib['VALUE'] = f"{new_ra_val:.6f}"
     else:
         print(f"  [Warning] Case {case_id}: Base XML 中未找到变量 Seat_Back_rotation_Angle")
 
     # 定义其它的要修改的变量映射 {VAR_NAME: New_Value_String}
-    # 对应文档 Source 42, 49, 56, 64, 72, 78, 86, 99, 104, 109
-    vars_map = {
-        "R_LL1F": f"{val_ll1_N:.4f}",       # 一级限力值
-        "R_LL2F": f"{val_ll2_N:.4f}",       # 二级限力值
-        "RPTTF_def": f"{val_btf_s:.6f}",    # 预紧器点火
-        "APTTF_def": f"{val_ptf_s:.6f}",    # 腰部预紧器点火
-        "R_LL2TF": f"{val_ll2tf_s:.6f}",    # 二级限力切换
-        "Dring_pos": val_dring_pos,         # D环位置
-        "PAB_TTF": f"{val_aft_s:.6f}",      # 气囊点火
-        "hip_angle": f"{val_hip:.6f}",      # 三个关节角度
-        "knee_angle": f"{val_knee:.6f}",
-        "ankle_angle": f"{val_ankle:.6f}"
-    }
+    if is_driver == 0:  # 副驾
+        vars_map = {
+            "R_LL1F": f"{val_ll1_N:.4f}",       # 一级限力值
+            "R_LL2F": f"{val_ll2_N:.4f}",       # 二级限力值
+            "RPTTF_def": f"{val_btf_s:.6f}",    # 预紧器点火
+            "APTTF_def": f"{val_ptf_s:.6f}",    # 腰部预紧器点火
+            "R_LL2TF": f"{val_ll2tf_s:.6f}",    # 二级限力切换
+            "Dring_pos": val_dring_pos,         # D环位置
+            "PAB_TTF": f"{val_aft_s:.6f}",      # 气囊点火
+            "hip_angle": f"{val_hip:.6f}",      # 三个关节角度
+            "knee_angle": f"{val_knee:.6f}",
+            "ankle_angle": f"{val_ankle:.6f}"
+        }
+    elif is_driver == 1:  # 主驾
+        vars_map = {
+            "R_LL1F": f"{val_ll1_N:.4f}",       # 一级限力值
+            "R_LL2F": f"{val_ll2_N:.4f}",       # 二级限力值
+            "RPTTF_def": f"{val_btf_s:.6f}",    # 预紧器点火
+            "APTTF_def": f"{val_ptf_s:.6f}",    # 腰部预紧器点火
+            "R_LL2TF": f"{val_ll2tf_s:.6f}",    # 二级限力切换
+            "Dring_pos": val_dring_pos,         # D环位置
+            "PAB_TTF": f"{val_aft_s:.6f}",      # 气囊点火
+            "hipL_angle": f"{val_hipL:.6f}",    # 八个关节角度
+            "hipR_angle": f"{val_hipR:.6f}",
+            "kneeL_angle": f"{val_kneeL:.6f}",
+            "kneeR_angle": f"{val_kneeR:.6f}",
+            "AnkleL_angle": f"{val_ankleL:.6f}",
+            "AnkleR_angle": f"{val_ankleR:.6f}",
+            "shoulder_angle": f"{val_shoulder:.6f}",
+            "elbow_angle": f"{val_elbow:.6f}"
+        }
 
     # 执行 Define 替换
     for var_name, value in vars_map.items():
@@ -280,7 +348,6 @@ def process_single_case(base_tree, case_data, case_id, is_driver, ot):
     # 波形文件的命名使用的是主驾 ID
     driver_case_id = case_id if is_driver else (case_id - NON_DRIVER_OFFSET)
     
-    # 修改配置：移除 ID 依赖，使用精确的 NAME 
     pulse_configs = [
         {'axis': 'x', 'exact_name': 'X_lin_pulse_fun'},
         {'axis': 'y', 'exact_name': 'Y_lin_pulse_fun'}

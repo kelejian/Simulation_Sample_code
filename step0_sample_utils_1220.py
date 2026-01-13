@@ -905,9 +905,9 @@ elif new_distribution_path.endswith('.csv'):
 # %% -Final.将头颈胸损伤标签（HIC15, Dmax, Nij）添加到distribution文件中
 import numpy as np
 import pandas as pd
-distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1220.csv'
-new_distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1224.csv'
-Injury_labels_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\Injury_labels_1224.xlsx'
+distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0112.csv'
+new_distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0113.csv'
+Injury_labels_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\Injury_labels_0112_40.xlsx'
 # 读取distribution文件
 if distribution_path.endswith('.npz'):
     distribution_npz = np.load(distribution_path, allow_pickle=True)
@@ -965,4 +965,37 @@ elif new_distribution_path.endswith('.csv'):
     print("Updated distribution file with injury labels has been saved.")
     
 
-# %%
+# %% 将指定case_id的损伤标签改为False 或 NaN
+import numpy as np
+import pandas as pd
+distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0107.csv'
+new_distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0107_V2.csv'
+# 读取distribution文件
+if distribution_path.endswith('.npz'):
+    distribution_npz = np.load(distribution_path, allow_pickle=True)
+    distribution_df = pd.DataFrame({
+            key: distribution_npz[key]
+            for key in distribution_npz.files
+        }).set_index('case_id', drop=False)
+elif distribution_path.endswith('.csv'):
+    distribution_df = pd.read_csv(distribution_path)
+    distribution_df.set_index('case_id', inplace=True, drop=False)
+else:
+    raise ValueError("Unsupported distribution file format. Use .csv or .npz")
+# 需要更新的case_id列表
+case_ids_to_update = [50911, 50488, 56409]
+for case_id in case_ids_to_update:
+    if case_id in distribution_df.index:
+        distribution_df.at[case_id, 'is_injury_ok'] = np.nan # 或者False
+        distribution_df.at[case_id, 'HIC15'] = np.nan
+        distribution_df.at[case_id, 'Dmax'] = np.nan
+        distribution_df.at[case_id, 'Nij'] = np.nan
+        print(f"Updated injury labels to False/NaN for case_id {case_id}.")
+    else:
+        print(f"Warning: case_id {case_id} not found in distribution.")
+# 保存更新后的distribution文件
+if new_distribution_path.endswith('.npz'):
+    np.savez(new_distribution_path, **{col: distribution_df[col].values for col in distribution_df.columns})
+elif new_distribution_path.endswith('.csv'):
+    distribution_df.to_csv(new_distribution_path, index=False)
+    print("Updated distribution file with injury labels has been saved.")
