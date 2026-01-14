@@ -475,19 +475,19 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
     SP_RANGES = {
         # (is_driver_side, OT): (min_sp, max_sp)
         (1, 1): (20, 110),     # 主驾 5th
-        (1, 2): (-80, 80),     # 主驾 50th
+        (1, 2): (-40, 60),     # 主驾 50th 20260114调整
         (1, 3): (-110, 20),    # 主驾 95th
         (0, 1): (-110, 110),   # 副驾 5th
         (0, 2): (-110, 110),   # 副驾 50th
         (0, 3): (-110, 49),    # 副驾 95th
     }
     
-    # RA离散值：主驾 [15, 20, 25, 30, 35]°，副驾 [20, 25, 30, 35, 40]°
+    # RA离散值：主驾 [15, 20, 25, 30]°，副驾 [20, 25, 30, 35, 40]°
     RA_VALUES = {
-        1: np.array([15, 20, 25, 30, 35]),  # 主驾
+        1: np.array([15, 20, 25, 30]),  # 主驾 20260114调整
         0: np.array([20, 25, 30, 35, 40]),  # 副驾
     }
-    
+    # ==================== 定义DZ与OT的映射 ====================
     # DZ与OT的映射关系
     DZ_MAP = {
         1: 1,  # 5th假人 -> DZ=1
@@ -616,12 +616,12 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
 
 # ==================== 主程序入口 ====================
 if __name__ == '__main__':
-    distribution_file = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1219.csv'
-    new_filename = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1220.csv'
+    distribution_file = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0113.csv'
+    new_filename = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0114.csv'
     
     # 读取需要填充的case_id列表，可选只采样主驾侧的或副驾侧的
     # 条件：is_pulse_ok为True 且 OT为空（未采样过）
-    driver_side_only = 0  # 设置为1表示只采样主驾侧，0表示只采样副驾侧，None表示采样所有
+    driver_side_only = 1  # 设置为1表示只采样主驾侧，0表示只采样副驾侧，None表示采样所有
     if distribution_file.endswith('.csv'):
         df = pd.read_csv(distribution_file)
         if driver_side_only is not None:

@@ -363,7 +363,7 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
                 # 主驾 50th
                 mask_driver_50th = (side_valid == 1) & (ot_valid == 2)
                 if np.any(mask_driver_50th):
-                    is_sp_valid &= np.all((sp_valid[mask_driver_50th] >= -80) & (sp_valid[mask_driver_50th] <= 80))
+                    is_sp_valid &= np.all((sp_valid[mask_driver_50th] >= -40) & (sp_valid[mask_driver_50th] <= 60)) # 20260114修改主驾50th范围
                 
                 # 主驾 95th
                 mask_driver_95th = (side_valid == 1) & (ot_valid == 3)
@@ -394,13 +394,13 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
                 ra_valid = ra_data[valid_mask]
                 side_valid = side_data[valid_mask]
                 
-                # RA离散值：主驾 [15, 20, 25, 30, 35]°，副驾 [20, 25, 30, 35, 40]°
+                # RA离散值：主驾 [15, 20, 25, 30]°，副驾 [20, 25, 30, 35, 40]°
                 is_ra_valid = True
                 
                 # 主驾
                 mask_driver = (side_valid == 1)
                 if np.any(mask_driver):
-                    driver_ra_allowed = [15, 20, 25, 30, 35]
+                    driver_ra_allowed = [15, 20, 25, 30] # 20260114修改主驾最大35为30
                     is_ra_valid &= np.all(np.isin(ra_valid[mask_driver], driver_ra_allowed))
                 
                 # 副驾
@@ -639,9 +639,9 @@ if __name__ == '__main__':
     
     # MADYMO验证
     verify_and_visualize_params(
-        r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1220.csv',
+        r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0114.csv',
         flag='MADYMO',
-        output_dir='MADYMO_sample_verification_1220',
+        output_dir='MADYMO_sample_verification_0114',
         param_pairs=[
             ('LL1', 'LL2'),
             ('BTF', 'LLATTF'),
@@ -968,8 +968,8 @@ elif new_distribution_path.endswith('.csv'):
 # %% 将指定case_id的损伤标签改为False 或 NaN
 import numpy as np
 import pandas as pd
-distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0107.csv'
-new_distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0107_V2.csv'
+distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0114.csv'
+new_distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0114_V2.csv'
 # 读取distribution文件
 if distribution_path.endswith('.npz'):
     distribution_npz = np.load(distribution_path, allow_pickle=True)
@@ -983,13 +983,13 @@ elif distribution_path.endswith('.csv'):
 else:
     raise ValueError("Unsupported distribution file format. Use .csv or .npz")
 # 需要更新的case_id列表
-case_ids_to_update = [50911, 50488, 56409]
+case_ids_to_update = [54196, 53448,52484,50813,56952,53641,53044,51970,51667,52145]
 for case_id in case_ids_to_update:
     if case_id in distribution_df.index:
-        distribution_df.at[case_id, 'is_injury_ok'] = np.nan # 或者False
-        distribution_df.at[case_id, 'HIC15'] = np.nan
-        distribution_df.at[case_id, 'Dmax'] = np.nan
-        distribution_df.at[case_id, 'Nij'] = np.nan
+        distribution_df.at[case_id, 'is_injury_ok'] = False  # nan or False
+        # distribution_df.at[case_id, 'HIC15'] = np.nan
+        # distribution_df.at[case_id, 'Dmax'] = np.nan
+        # distribution_df.at[case_id, 'Nij'] = np.nan
         print(f"Updated injury labels to False/NaN for case_id {case_id}.")
     else:
         print(f"Warning: case_id {case_id} not found in distribution.")

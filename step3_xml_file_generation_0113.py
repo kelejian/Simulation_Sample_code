@@ -316,8 +316,8 @@ def process_single_case(base_tree, case_data, case_id, is_driver, ot):
         }
     elif is_driver == 1:  # 主驾
         vars_map = {
-            "R_LL1F": f"{val_ll1_N:.4f}",       # 一级限力值
-            "R_LL2F": f"{val_ll2_N:.4f}",       # 二级限力值
+            "R_LL1F": f"{val_ll1_N:.6f}",       # 一级限力值
+            "R_LL2F": f"{val_ll2_N:.6f}",       # 二级限力值
             "RPTTF_def": f"{val_btf_s:.6f}",    # 预紧器点火
             "APTTF_def": f"{val_ptf_s:.6f}",    # 腰部预紧器点火
             "R_LL2TF": f"{val_ll2tf_s:.6f}",    # 二级限力切换
