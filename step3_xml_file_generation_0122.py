@@ -147,13 +147,13 @@ def calc_joint_angles(ot, is_driver, Seat_X_Disp, Seat_Z_Disp, Seat_Back_rotatio
                     - 0.1564*z*sinA + 7.1326*z*cosA)
             
             # 2) kneeL_angle
-            kneeL = (-3.2752 - 4.9081*x + 3.7214*z 
+            kneeL = (3.2752 - 4.9081*x + 3.7214*z 
                      + 0.2760*sinA - 3.6008*cosA 
                      + 0.1346*x*sinA + 5.8424*x*cosA 
                      + 0.1545*z*sinA - 3.8715*z*cosA)
             
             # 3) AnkleL_angle
-            ankleL = (-3.5722 - 3.9128*x - 1.0510*z 
+            ankleL = (3.5722 - 3.9128*x - 1.0510*z 
                       + 0.0780*sinA - 3.5596*cosA 
                       - 0.2896*x*sinA + 3.7978*x*cosA 
                       - 0.1528*z*sinA + 1.0101*z*cosA)
@@ -165,13 +165,13 @@ def calc_joint_angles(ot, is_driver, Seat_X_Disp, Seat_Z_Disp, Seat_Back_rotatio
                     + 0.2219*z*sinA - 4.4373*z*cosA)
             
             # 5) kneeR_angle
-            kneeR = (-1.2849 - 2.9211*x + 3.3403*z 
+            kneeR = (1.2849 - 2.9211*x + 3.3403*z 
                      + 0.3666*sinA - 1.5224*cosA 
                      + 0.0528*x*sinA + 3.5022*x*cosA 
                      + 0.0819*z*sinA - 3.5360*z*cosA)
             
             # 6) AnkleR_angle
-            ankleR = (-0.0510 - 0.2372*x - 1.9154*z 
+            ankleR = (0.0510 - 0.2372*x - 1.9154*z 
                       - 0.1014*sinA - 0.0182*cosA 
                       - 0.1907*x*sinA - 0.0876*x*cosA 
                       - 0.1604*z*sinA + 1.8528*z*cosA)
