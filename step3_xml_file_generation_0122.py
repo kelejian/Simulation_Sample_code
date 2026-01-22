@@ -28,7 +28,7 @@ XML_TYPE = 'DS_50th'
 # 请根据实际环境确认以下路径
 BASE_XML_DIR = r'D:\MADYMO_xml文件'
 # =================================*****===================================
-PARAM_FILE_PATH = r'I:\000 LX\dataset0715\03\distribution_0113.csv'
+PARAM_FILE_PATH = r'I:\000 LX\dataset0715\03\distribution_0122.csv'
 # =================================*****===================================
 PULSE_FILES_DIR = r'I:\000 LX\dataset0715\03\acc_data_before1111_6134'
 OUTPUT_DIR = os.path.join(BASE_XML_DIR, XML_TYPE)
@@ -82,9 +82,9 @@ def parse_xml_type(xml_type):
     ot = OT_MAPPING.get(percentile_str, 2)
     return is_driver, ot, percentile_str
 
-def calc_joint_angles(ot, is_driver, Seat_X_Disp):
+def calc_joint_angles(ot, is_driver, Seat_X_Disp, Seat_Z_Disp, Seat_Back_rotation_Angle):
     """
-    根据xml文件座椅位置 Seat_X_Disp 和 假人类型 OT 计算关节角度 (rad)
+    根据xml文件座椅位置 Seat_X_Disp , 座椅高度Seat_Z_Disp , 座椅靠背角度Seat_Back_rotation_Angle和假人类型 OT 计算关节角度 (rad)
     """
     if is_driver == 0: # 副驾PS
         # 初始化
@@ -126,42 +126,73 @@ def calc_joint_angles(ot, is_driver, Seat_X_Disp):
         return hip, knee, ankle
                 
     if is_driver == 1: # 主驾DS
-        # 初始化
+        # 初始化8个假人关节角度
         hipL, hipR, ankleL, ankleR, elbow, shoulder, kneeL, kneeR = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
         # --- 主驾5th假人 (OT=1) ---
         if ot == 1:
-            pass
+            raise NotImplementedError("主驾5th假人关节角度计算未实现")
         # --- 主驾50th假人 (OT=2) ---
         elif ot == 2:
-            # 肘关节角度 elbow_angle: y = -5.0446x - 0.4672
-            elbow = -5.0446 * Seat_X_Disp - 0.4672
+            # 根据公式要求，对X和Z进行归一化处理: x = X/0.1, z = Z/0.1
+            x = Seat_X_Disp / 0.1
+            z = Seat_Z_Disp / 0.1
+            A = Seat_Back_rotation_Angle
+            sinA = np.sin(A)
+            cosA = np.cos(A)
             
-            # 肩关节角度 shoulder_angle: y = 1.7536x - 0.907
-            shoulder = 1.7536 * Seat_X_Disp - 0.907
+            # 1) hipL_angle
+            hipL = (-3.3573 + 4.7475*x - 6.8897*z 
+                    - 1.2473*sinA + 3.4861*cosA 
+                    + 0.0702*x*sinA - 5.1564*x*cosA 
+                    - 0.1564*z*sinA + 7.1326*z*cosA)
             
-            # 踝关节L角度 ankleL_angle: y = -3.2955x + 0.0937
-            ankleL = -3.2955 * Seat_X_Disp + 0.0937
+            # 2) kneeL_angle
+            kneeL = (-3.2752 - 4.9081*x + 3.7214*z 
+                     + 0.2760*sinA - 3.6008*cosA 
+                     + 0.1346*x*sinA + 5.8424*x*cosA 
+                     + 0.1545*z*sinA - 3.8715*z*cosA)
             
-            # 踝关节R角度 ankleR_angle: y = 5.1148x - 0.2174
-            ankleR = 5.1148 * Seat_X_Disp - 0.2174
+            # 3) AnkleL_angle
+            ankleL = (-3.5722 - 3.9128*x - 1.0510*z 
+                      + 0.0780*sinA - 3.5596*cosA 
+                      - 0.2896*x*sinA + 3.7978*x*cosA 
+                      - 0.1528*z*sinA + 1.0101*z*cosA)
             
-            # 膝关节L角度 kneeL_angle: y = 5.1148x - 0.2174
-            kneeL = 5.1148 * Seat_X_Disp - 0.2174
+            # 4) hipR_angle
+            hipR = (-5.6526 + 3.5477*x + 4.6278*z 
+                    - 1.4147*sinA + 5.7760*cosA 
+                    + 0.1167*x*sinA - 3.8220*x*cosA 
+                    + 0.2219*z*sinA - 4.4373*z*cosA)
             
-            # 膝关节R角度 kneeR_angle: y = 4.873x - 0.2098
-            kneeR = 4.873 * Seat_X_Disp - 0.2098
+            # 5) kneeR_angle
+            kneeR = (-1.2849 - 2.9211*x + 3.3403*z 
+                     + 0.3666*sinA - 1.5224*cosA 
+                     + 0.0528*x*sinA + 3.5022*x*cosA 
+                     + 0.0819*z*sinA - 3.5360*z*cosA)
             
-            # 髋关节L角度 hipL_angle: y = -2.3329x + 0.1008
-            hipL = -2.3329 * Seat_X_Disp + 0.1008
+            # 6) AnkleR_angle
+            ankleR = (-0.0510 - 0.2372*x - 1.9154*z 
+                      - 0.1014*sinA - 0.0182*cosA 
+                      - 0.1907*x*sinA - 0.0876*x*cosA 
+                      - 0.1604*z*sinA + 1.8528*z*cosA)
             
-            # 髋关节R角度 hipR_angle: y = -2.2783x + 0.0974
-            hipR = -2.2783 * Seat_X_Disp + 0.0974
+            # 7) shoulder_angle
+            shoulder = (-1.5157 + 5.6963*x - 8.2674*z 
+                        - 0.5847*sinA + 0.6854*cosA 
+                        + 1.9682*x*sinA - 5.4041*x*cosA 
+                        - 0.2962*z*sinA + 8.3978*z*cosA)
+            
+            # 8) elbow_angle
+            elbow = (2.1810 - 6.4882*x + 11.1580*z 
+                     - 1.3810*sinA - 2.7929*cosA 
+                     - 1.9498*x*sinA + 5.8832*x*cosA 
+                     + 0.6987*z*sinA - 11.1209*z*cosA)
             
             return hipL, hipR, kneeL, kneeR, ankleL, ankleR, shoulder, elbow
             
         # --- 主驾95th假人 (OT=3) ---
         elif ot == 3:
-            pass
+            raise NotImplementedError("主驾95th假人关节角度计算未实现")
 
 
 def get_pulse_data_string(pulse_dir, driver_case_id, axis):
@@ -245,11 +276,12 @@ def process_single_case(base_tree, case_data, case_id, is_driver, ot):
         val_btf_s = get_val(['BTF']) / 1000.0          # ms -> s 
         val_ptf_s = get_val(['PTF']) / 1000.0          # ms -> s 
         val_aft_s = get_val(['AFT']) / 1000.0          # ms -> s 
-        val_sp_m  = get_val(['SP']) / 1000.0           # mm -> m 
+        val_sp_m  = get_val(['SP']) / 1000.0           # mm -> m
+        val_sh_m  = get_val(['SH']) / 1000.0           # mm -> m 
         
         # 原始值读取
         raw_llattf = get_val(['LLATTF'])               # ms 
-        raw_ra_deg = get_val(['RA', 'recline_angle'])  # degree 
+        raw_ra_deg = get_val(['RA'])                   # degree 
         dz_level   = int(get_val(['DZ']))              # level 
         
     except KeyError as e:
@@ -277,28 +309,37 @@ def process_single_case(base_tree, case_data, case_id, is_driver, ot):
     sp_nodes = root.xpath(".//DEFINE[@VAR_NAME='Seat_X_Disp']")
     if sp_nodes:
         base_sp_val = float(sp_nodes[0].attrib['VALUE'])
-        Seat_X_Disp = base_sp_val + val_sp_m
+        Seat_X_Disp = base_sp_val + val_sp_m # 单位: m
         sp_nodes[0].attrib['VALUE'] = f"{Seat_X_Disp:.6f}"
     else:
-        print(f"  [Warning] Case {case_id}: Base XML 中未找到变量 Seat_X_Disp")
+        raise ValueError(f"  [Error] Case {case_id}: Base XML 中未找到变量 Seat_X_Disp")
 
-    # 三个关节角度计算（基于更新后的 Seat_X_Disp）
-    joint_angles = calc_joint_angles(ot, is_driver, Seat_X_Disp)
+    # 处理 Seat_Z_Disp = base value + SH采样值
+    sz_nodes = root.xpath(".//DEFINE[@VAR_NAME='Seat_Z_Disp']")
+    if sz_nodes:
+        base_sz_val = float(sz_nodes[0].attrib['VALUE'])
+        Seat_Z_Disp = base_sz_val + val_sh_m # 座椅高度, 单位: m
+        sz_nodes[0].attrib['VALUE'] = f"{Seat_Z_Disp:.6f}"
+    else:
+        raise ValueError(f"  [Error] Case {case_id}: Base XML 中未找到变量 Seat_Z_Disp")
+
+    # Seat_Back_rotation_Angle = base value - deg2rad[RA采样值 - 25°]
+    ra_nodes = root.xpath(".//DEFINE[@VAR_NAME='Seat_Back_rotation_Angle']")
+    if ra_nodes:
+        base_ra_val = float(ra_nodes[0].attrib['VALUE'])
+        Seat_Back_rotation_Angle = base_ra_val + delta_ra_rad # 注意这里是加上 delta，因为 delta 已经包含了负号; 单位: rad
+        ra_nodes[0].attrib['VALUE'] = f"{Seat_Back_rotation_Angle:.6f}"
+    else:
+        raise ValueError(f"  [Error] Case {case_id}: Base XML 中未找到变量 Seat_Back_rotation_Angle")
+        
+    # 三个关节角度计算（基于更新后的 Seat_X_Disp, Seat_Z_Disp, Seat_Back_rotation_Angle）
+    joint_angles = calc_joint_angles(ot, is_driver, Seat_X_Disp, Seat_Z_Disp, Seat_Back_rotation_Angle)
     
     # 根据驾驶侧解包角度值
     if is_driver == 0:  # 副驾：3个角度 (hip, knee, ankle)
         val_hip, val_knee, val_ankle = joint_angles
     else:  # 主驾：8个角度
         val_hipL, val_hipR, val_kneeL, val_kneeR, val_ankleL, val_ankleR, val_shoulder, val_elbow = joint_angles
-
-    # Seat_Back_rotation_Angle = base value - deg2rad[RA采样值 - 25°]
-    ra_nodes = root.xpath(".//DEFINE[@VAR_NAME='Seat_Back_rotation_Angle']")
-    if ra_nodes:
-        base_ra_val = float(ra_nodes[0].attrib['VALUE'])
-        new_ra_val = base_ra_val + delta_ra_rad # 注意这里是加上 delta，因为 delta 已经包含了负号
-        ra_nodes[0].attrib['VALUE'] = f"{new_ra_val:.6f}"
-    else:
-        print(f"  [Warning] Case {case_id}: Base XML 中未找到变量 Seat_Back_rotation_Angle")
 
     # 定义其它的要修改的变量映射 {VAR_NAME: New_Value_String}
     if is_driver == 0:  # 副驾

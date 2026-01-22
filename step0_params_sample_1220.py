@@ -187,9 +187,9 @@ def sample_collision_params(n_samples=6000, skip_points=1024, method='uniform',
     
     # 添加nan值占位约束系统参数和损伤值标签
     param_names = [
-        'occupant_type', 'll1', 'll2', 'btf', 'pp', 'plp',
-        'lla_status', 'llattf', 'dz', 'ptf', 'aft', 'aav_status',
-        'ttf', 'sp', 'recline_angle',
+        'OT', 'LL1', 'LL2', 'BTF', 
+        'LLATTF', 'DZ', 'PTF', 'AFT',
+        'SP', 'SH', 'RA',
         'HIC15', 'Dmax', 'Nij'
     ]
     
@@ -232,6 +232,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import qmc
 from scipy.interpolate import RectBivariateSpline
+from matplotlib.path import Path
 class BTFSampler:
     """
     根据速度和重叠率，在一个动态范围内随机采样BTF值。
@@ -372,7 +373,7 @@ def create_piecewise_sampler(histogram_data):
     return sampler
 
 
-def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, skip_points=2048, seed=20252025):
+def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, skip_points=2048, seed=20252025, sample_ot=True):
     """
     对约束系统参数进行采样，并填充到指定的文件中，区分主副驾侧）
     
@@ -383,11 +384,14 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
     - n_samples: 采样数量，默认为case_ids的长度
     - skip_points: 跳过的初始点数量
     - seed: 随机种子
+    - sample_ot: 是否对OT（乘员体型）进行采样。如果为False，则保持文件中的原值。
     
     返回:
     - 新文件名
     """
     print(f"开始对约束系统参数进行采样...")
+    if not sample_ot:
+        print("  - 注意：将保持原有的OT（乘员体型）值，不进行重新采样")
     
     # 确定采样数量
     if n_samples is None:
@@ -413,14 +417,15 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
     
     # ==================== 定义参数采样维度 ====================
     param_dims = {
-        'OT':           0,   # 乘员体型 [1, 2, 3]
-        'LL1':          1,   # 一级限力值 [2.0, 7.0] kN，非均匀采样
-        'LL2':          2,   # 二级限力值 [1.5, 4.5] kN，非均匀采样
-        'BTF':          3,   # 预紧器点火时刻（用于备用采样）
-        'LLATTF_offset': 4,  # 二级限力切换时间偏移 [0, 100] ms
-        'AFT':          5,   # 气囊点火时刻 [10, 100] ms
-        'SP':           6,   # 座椅前后位置（归一化采样，后续根据体型和主副驾映射）
-        'RA':           7,   # 座椅靠背角度（归一化采样，后续离散化）
+        'OT':            0,   # 乘员体型 [1, 2, 3]
+        'LL1':           1,   # 一级限力值 [2.0, 7.0] kN，非均匀采样
+        'LL2':           2,   # 二级限力值 [1.5, 4.5] kN，非均匀采样
+        'BTF':           3,   # 预紧器点火时刻（用于备用采样）
+        'LLATTF_offset': 4,   # 二级限力切换时间偏移 [0, 100] ms
+        'AFT':           5,   # 气囊点火时刻 [10, 100] ms
+        'SP':            6,   # 座椅前后位置（归一化采样，后续根据体型和主副驾映射）
+        'SH':            7,   # 座椅高度（归一化采样，后续根据体型和主副驾映射）[NEW]
+        'RA':            8,   # 座椅靠背角度（归一化采样，后续离散化）
     }
     
     # ==================== 初始化采样器 ====================
@@ -467,19 +472,20 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
     impact_velocity_map = dict(zip(existing_data['case_id'], existing_data['impact_velocity']))
     overlap_map = dict(zip(existing_data['case_id'], existing_data['overlap']))
     is_driver_side_map = dict(zip(existing_data['case_id'], existing_data['is_driver_side']))
+    existing_ot_map = dict(zip(existing_data['case_id'], existing_data['OT']))
     
-    # ==================== 定义SP和RA的范围映射 ====================
-    # SP范围：根据主副驾侧和乘员体型确定
-    # 主驾 (is_driver_side=1): 5th: [+20, +110], 50th: [-80, +80], 95th: [-110, +20]
-    # 副驾 (is_driver_side=0): 5th/50th: [-110, +110], 95th: [-110, +49]
-    SP_RANGES = {
-        # (is_driver_side, OT): (min_sp, max_sp)
-        (1, 1): (20, 110),     # 主驾 5th
-        (1, 2): (-40, 60),     # 主驾 50th 20260114调整
-        (1, 3): (-110, 20),    # 主驾 95th
-        (0, 1): (-110, 110),   # 副驾 5th
-        (0, 2): (-110, 110),   # 副驾 50th
-        (0, 3): (-110, 49),    # 副驾 95th
+    # ==================== 定义SP和SH的范围约束 (SP, SH) ====================
+    # 6组采样约束区域，每组由4个点定义的梯形组成 [(SP1, SH1), (SP2, SH2), (SP3, SH3), (SP4, SH4)]
+    # 请在此处修改具体的四个坐标点
+    # 默认SH范围近似 -10 ~ 70 mm
+    SEAT_CONSTRAINTS = {
+        # (is_driver_side [1=Main, 0=Pass], OT [1=5th, 2=50th, 3=95th])
+        (1, 1): [(20, -10), (110, -10), (110, 70), (20, 70)],      # 主驾 5th
+        (1, 2): [(-40, -40/18), (60, 60/18), (60, 60), (-40, 60)],      # 主驾 50th ; 0122调整
+        (1, 3): [(-110, -10), (20, -10), (20, 70), (-110, 70)],    # 主驾 95th
+        (0, 1): [(-110, -10), (110, -10), (110, 70), (-110, 70)],  # 副驾 5th
+        (0, 2): [(-110, -10), (110, -10), (110, 70), (-110, 70)],  # 副驾 50th
+        (0, 3): [(-110, -10), (49, -10), (49, 70), (-110, 70)],    # 副驾 95th
     }
     
     # RA离散值：主驾 [15, 20, 25, 30]°，副驾 [20, 25, 30, 35, 40]°
@@ -498,7 +504,7 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
     # ==================== 开始采样 ====================
     results = {
         'OT': [], 'LL1': [], 'LL2': [], 'BTF': [], 'LLATTF': [],
-        'DZ': [], 'AFT': [], 'SP': [], 'RA': [], 'PTF': []
+        'DZ': [], 'AFT': [], 'SP': [], 'SH': [], 'RA': [], 'PTF': []
     }
     
     for i in range(n_samples):
@@ -511,10 +517,22 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
         is_driver_side = is_driver_side_map.get(case_id, 1)  # 默认主驾
         
         # -------------------- 乘员体型 OT (非均匀采样) --------------------
-        # OT=1(30%), OT=2(40%), OT=3(30%)
-        ot_continuous = ot_sampler(sample[param_dims['OT']])  # 返回值在[0, 3)范围内
-        ot_val = int(np.floor(ot_continuous)) + 1  # 转换为1, 2, 3
-        ot_val = max(min(ot_val, 3), 1)  # 确保在[1, 3]范围内
+        if sample_ot:
+            # OT=1(30%), OT=2(40%), OT=3(30%)
+            ot_continuous = ot_sampler(sample[param_dims['OT']])  # 返回值在[0, 3)范围内
+            ot_val = int(np.floor(ot_continuous)) + 1  # 转换为1, 2, 3
+            ot_val = max(min(ot_val, 3), 1)  # 确保在[1, 3]范围内
+        else:
+            # 保持原值
+            ot_val = existing_ot_map.get(case_id, np.nan)
+            if pd.isna(ot_val):
+                # 如果原值为NaN，回退到采样逻辑
+                ot_continuous = ot_sampler(sample[param_dims['OT']]) 
+                ot_val = int(np.floor(ot_continuous)) + 1
+                ot_val = max(min(ot_val, 3), 1)
+            else:
+                ot_val = int(ot_val)
+                
         results['OT'].append(ot_val)
         
         # -------------------- D环高度 DZ (不采样，由OT确定) --------------------
@@ -574,11 +592,30 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
             aft_val = rejection_rng.uniform(10, min(100, max_aft))
         results['AFT'].append(float(aft_val))
         
-        # -------------------- 座椅前后位置 SP (区分主副驾和体型) --------------------
-        sp_range = SP_RANGES.get((int(is_driver_side), ot_val), (-110, 110))
-        sp_min, sp_max = sp_range
+        # -------------------- 座椅前后位置 SP & 座椅高度 SH (耦合约束) --------------------
+        # 获取当前工况的约束多边形顶点
+        poly_points = SEAT_CONSTRAINTS.get((int(is_driver_side), ot_val))
+        if poly_points is None:
+            # 默认全范围兜底
+            poly_points = [(-110, -10), (110, -10), (110, 70), (-110, 70)] 
+            
+        # 计算包围盒 (Bounding Box)
+        poly_points = np.array(poly_points)
+        sp_min, sh_min = np.min(poly_points, axis=0)
+        sp_max, sh_max = np.max(poly_points, axis=0)
+        
+        # 将Sobol样本映射到包围盒
         sp_val = sample[param_dims['SP']] * (sp_max - sp_min) + sp_min
+        sh_val = sample[param_dims['SH']] * (sh_max - sh_min) + sh_min
+        
+        # 检查是否在多边形内部，如果不在则进行拒绝采样
+        poly_path = Path(poly_points)
+        while not poly_path.contains_point((sp_val, sh_val)):
+            sp_val = rejection_rng.uniform(sp_min, sp_max)
+            sh_val = rejection_rng.uniform(sh_min, sh_max)
+            
         results['SP'].append(float(sp_val))
+        results['SH'].append(float(sh_val))
         
         # -------------------- 座椅靠背角度 RA (离散化采样，区分主副驾) --------------------
         ra_options = RA_VALUES.get(int(is_driver_side), RA_VALUES[1])
@@ -610,29 +647,33 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
         raise ValueError("Unsupported file format. Use '.npz' or '.csv'.")
     
     print(f"约束系统参数采样并填充完成，结果已保存至 '{new_filename}'")
-    print(f"  - 采样参数: OT, LL1, LL2, BTF, LLATTF, DZ, AFT, SP, RA, PTF")
+    print(f"  - 采样参数: OT, LL1, LL2, BTF, LLATTF, DZ, AFT, SP, SH, RA, PTF")
     return new_filename
 
 
 # ==================== 主程序入口 ====================
 if __name__ == '__main__':
-    distribution_file = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0113.csv'
-    new_filename = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0114.csv'
+    distribution_file = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0121.csv'
+    new_filename = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0122.csv'
     
     # 读取需要填充的case_id列表，可选只采样主驾侧的或副驾侧的
-    # 条件：is_pulse_ok为True 且 OT为空（未采样过）
+    # 条件：is_pulse_ok为True 且 OT 满足特定条件
     driver_side_only = 1  # 设置为1表示只采样主驾侧，0表示只采样副驾侧，None表示采样所有
+    sample_ot_flag = False  # True: 重新采样OT; False: 保持原有OT值
+    
     if distribution_file.endswith('.csv'):
         df = pd.read_csv(distribution_file)
         if driver_side_only is not None:
             df = df[df['is_driver_side'] == driver_side_only]
-        case_ids_to_fill = df[(df['is_pulse_ok'] == True) & (df['OT'].isnull())]['case_id'].tolist()
+        # 只采样 is_pulse_ok 为 True 且 OT 为2（50th假人）的case_id
+        case_ids_to_fill = df[(df['is_pulse_ok'] == True) & (df['OT']==2)]['case_id'].tolist()
     elif distribution_file.endswith('.npz'):
         with np.load(distribution_file) as data:
             df = pd.DataFrame({key: data[key] for key in data.files})
             if driver_side_only is not None:
                 df = df[df['is_driver_side'] == driver_side_only]
-            case_ids_to_fill = df[(df['is_pulse_ok'] == True) & (df['OT'].isnull())]['case_id'].tolist()
+            # 只采样 is_pulse_ok 为 True 且 OT 为2（50th假人）的case_id
+            case_ids_to_fill = df[(df['is_pulse_ok'] == True) & (df['OT']==2)]['case_id'].tolist()
     else:
         raise ValueError("Unsupported file format.")
     if driver_side_only == 1:
@@ -641,6 +682,10 @@ if __name__ == '__main__':
         print("仅对副驾侧进行约束系统参数采样。")
     else:
         print("对主副驾侧都进行约束系统参数采样。")
+        
+    if not sample_ot_flag:
+        print("注意：本次运行将保持原有的OT（乘员体型）值。")
+
     print(f"需要填充约束系统参数的case_id数量: {len(case_ids_to_fill)}")
     
     if len(case_ids_to_fill) > 0:
@@ -648,8 +693,9 @@ if __name__ == '__main__':
             filename=distribution_file,
             new_filename=new_filename,
             case_ids=case_ids_to_fill,
-            skip_points=2048,
-            seed=20251220
+            skip_points=8192,
+            seed=20260122,
+            sample_ot=sample_ot_flag
         )
     else:
         print("没有需要填充的case_id，跳过采样。")

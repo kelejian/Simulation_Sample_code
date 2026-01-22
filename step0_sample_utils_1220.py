@@ -983,7 +983,7 @@ elif distribution_path.endswith('.csv'):
 else:
     raise ValueError("Unsupported distribution file format. Use .csv or .npz")
 # 需要更新的case_id列表
-case_ids_to_update = [52145, 54284, 53844, 53448, 53641, 56952, 50813, 54254, 57034, 53690, 55617, 51667, 51970, 53044, 54957, 53176, 56323]
+case_ids_to_update = [52145, 54284, 53844, 53448, 53641, 56952, 50813, 54254, 57034, 53690, 55617, 51667, 51970, 53044, 54957, 53176, 56323, 54196, 54921, 55707]
 for case_id in case_ids_to_update:
     if case_id in distribution_df.index:
         distribution_df.at[case_id, 'is_injury_ok'] = False  # nan or False
