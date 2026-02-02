@@ -629,19 +629,19 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
 
 
 if __name__ == '__main__':
-    # VCS验证
-    verify_and_visualize_params(
-        r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1220.csv',
-        flag='VCS',
-        output_dir='VCS_sample_verification_1220',
-        param_pairs=[('impact_velocity', 'impact_angle'), ('impact_velocity', 'overlap'), ('impact_angle', 'overlap')]
-    )
+    # # VCS验证
+    # verify_and_visualize_params(
+    #     r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1220.csv',
+    #     flag='VCS',
+    #     output_dir='VCS_sample_verification_1220',
+    #     param_pairs=[('impact_velocity', 'impact_angle'), ('impact_velocity', 'overlap'), ('impact_angle', 'overlap')]
+    # )
     
     # MADYMO验证
     verify_and_visualize_params(
-        r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0114.csv',
+        r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0123.csv',
         flag='MADYMO',
-        output_dir='MADYMO_sample_verification_0114',
+        output_dir='MADYMO_sample_verification_0130',
         param_pairs=[
             ('LL1', 'LL2'),
             ('BTF', 'LLATTF'),
