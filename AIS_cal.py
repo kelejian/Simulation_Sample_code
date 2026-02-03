@@ -3,7 +3,7 @@ from typing import Union
 from scipy.stats import norm
 
 '''
-AIS计算公式统一为US-NCAP中的形式. 20260122
+AIS计算公式统一为US-NCAP中的形式. 20260122. 理想项目用
 '''
 
 def AIS_cal_head(
