@@ -6,6 +6,7 @@
 # %% 验证和可视化VCS或MADYMO采样结果（20251220-MADYMO采样验证）
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.path import Path
 import seaborn as sns
 import pandas as pd
 import os
@@ -61,6 +62,17 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
         data = {col: data_df[col].values for col in data_df.columns}
         print(f"*排除is_pulse_ok为False后，剩余样本数: {filtered_count} (初始样本数: {initial_count})")
         print("-" * 60)
+    # 限定主驾侧5th假人（OT=1）的样本进行验证和可视化
+    if 'OT' in data and 'is_driver_side' in data:
+        print("-" * 60)
+        print("*限定主驾侧5th假人（OT=1）的样本进行验证和可视化")
+        data_df = pd.DataFrame(data)
+        initial_count = len(data_df)
+        data_df = data_df[(data_df['OT'] == 1) & (data_df['is_driver_side'] == 1)]
+        filtered_count = len(data_df)
+        data = {col: data_df[col].values for col in data_df.columns}
+        print(f"*限定主驾侧5th假人后，剩余样本数: {filtered_count} (初始样本数: {initial_count})")
+        print("-" * 60)
     # ******************************************************************************
     
     # 定义参数组
@@ -85,15 +97,17 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
 
     else:  # MADYMO - 新版参数
         # 20251220版约束系统参数
-        params_to_check = ['OT', 'LL1', 'LL2', 'BTF', 'LLATTF', 'DZ', 'AFT', 'SP', 'RA', 'PTF']
+        params_to_check = ['OT', 'LL1', 'LL2', 'BTF', 'LLATTF', 'DZ', 'AFT', 'SP', 'SH', 'RA', 'PTF']
         
+        # 全局允许范围（*不*替代基于 OT/is_driver_side 的分段约束，只做快速合理性过滤）
         param_ranges = {
-            'LL1': (2.0, 7.0),      # 一级限力值 kN
-            'LL2': (1.5, 4.5),      # 二级限力值 kN
+            'LL1': (1.0, 7.0),      # 一级限力值 kN
+            'LL2': (0.5, 4.5),      # 二级限力值 kN
             'BTF': (10, 100),       # 预紧器点火时刻 ms
             'LLATTF': (10, 150),    # 二级限力切换时间 ms (最大150表示不切换)
             'AFT': (10, 100),       # 气囊点火时刻 ms
             'SP': (-110, 110),      # 座椅前后位置 mm (完整范围，实际根据体型和主副驾有约束)
+            'SH': (-10, 60),       # 座椅高度 mm（全局过滤范围；具体按 OT/is_driver_side 校验）
             'PTF': (17, 107),       # 腰部预紧器点火时间 ms (= BTF + 7)
         }
         
@@ -110,10 +124,11 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
             'LLATTF_vs_BTF',    # LLATTF >= BTF 且 LLATTF <= 150
             'DZ_vs_OT',         # DZ与OT的对应关系
             'SP_vs_OT_side',    # SP与体型和主副驾的关系
+            'SH_vs_OT_side',    # SH（座椅高度）与体型和主副驾的关系（新增）
             'RA_vs_side',       # RA与主副驾的关系
         ]
         
-        # 默认参数对
+        # 默认参数对（增加 SP vs SH 的联合可视化）
         if param_pairs is None:
             param_pairs = [
                 ('LL1', 'LL2'),
@@ -123,6 +138,7 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
                 ('OT', 'DZ'),
                 ('OT', 'SP'),
                 ('OT', 'RA'),
+                ('SP', 'SH'),
             ]
 
     print(f"检查参数组: {params_to_check}")
@@ -207,7 +223,18 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
             result = check_discrete(param, allowed_values)
             verification_results[param] = result
             all_checks_passed &= result
-    
+
+    # 额外：检查 is_driver_side 只包含 0 或 1（避免意外的其他编码）
+    if 'is_driver_side' in data:
+        vals = data['is_driver_side'][~np.isnan(data['is_driver_side'].astype(float))]
+        if len(vals) > 0:
+            is_driver_ok = np.all(np.isin(vals.astype(int), [0, 1]))
+            print(f"  - 检查 'is_driver_side' 取值仅为 0/1: {'通过' if is_driver_ok else '失败!!!!!!!'}")
+            if not is_driver_ok:
+                print(f"    非法取值示例: {np.unique(vals[~np.isin(vals.astype(int), [0,1])])}")
+            verification_results['is_driver_side'] = is_driver_ok
+            all_checks_passed &= is_driver_ok
+
     # 3. 特殊参数检查
     if flag == 'VCS':
         # 检查重叠率特殊区间: (-1, -0.25]∪[0.25, 1]
@@ -351,14 +378,14 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
                 side_valid = side_data[valid_mask]
                 
                 # SP范围定义
-                # 主驾 (is_driver_side=1): 5th: [+20, +110], 50th: [-80, +80], 95th: [-110, +20]
+                # 主驾 (is_driver_side=1): 5th: [+40, +110], 50th: [-40, +60], 95th: [-110, +20]
                 # 副驾 (is_driver_side=0): 5th/50th: [-110, +110], 95th: [-110, +49]
                 is_sp_valid = True
                 
                 # 主驾 5th
                 mask_driver_5th = (side_valid == 1) & (ot_valid == 1)
                 if np.any(mask_driver_5th):
-                    is_sp_valid &= np.all((sp_valid[mask_driver_5th] >= 20) & (sp_valid[mask_driver_5th] <= 110))
+                    is_sp_valid &= np.all((sp_valid[mask_driver_5th] >= 40) & (sp_valid[mask_driver_5th] <= 110))
                 
                 # 主驾 50th
                 mask_driver_50th = (side_valid == 1) & (ot_valid == 2)
@@ -383,6 +410,98 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
                 print(f"  - 检查 'SP' 与体型和主副驾的对应关系: {'通过' if is_sp_valid else '失败!!!!!!!'}")
                 verification_results['SP_vs_OT_side'] = is_sp_valid
                 all_checks_passed &= is_sp_valid
+
+                # -------------------- 额外严格校验：(SP, SH) 必须位于采样端定义的多边形内（逐组） --------------------
+                try:
+                    # 与采样端一致的多边形顶点（单位：mm）
+                    SEAT_POLYS = {
+                        (1, 1): [(40, 0), (110, 5.5), (110, 60), (80, 60), (80, 30), (40, 30)],
+                        (1, 2): [(-40, -2.2), (60, 3.3), (60, 60), (-40, 60)],
+                        (1, 3): [(-110, -10), (20, -10), (20, 70), (-110, 70)],
+                        (0, 1): [(-110, -10), (110, -10), (110, 70), (-110, 70)],
+                        (0, 2): [(-110, -10), (110, -10), (110, 70), (-110, 70)],
+                        (0, 3): [(-110, -10), (49, -10), (49, 70), (-110, 70)],
+                    }
+
+                    sp_sh_mask = ~(np.isnan(data.get('SP', np.array([np.nan]*len(data[first_param]))).astype(float)) |
+                                    np.isnan(data.get('SH', np.array([np.nan]*len(data[first_param]))).astype(float)) |
+                                    np.isnan(data.get('OT', np.array([np.nan]*len(data[first_param]))).astype(float)) |
+                                    np.isnan(data.get('is_driver_side', np.array([np.nan]*len(data[first_param]))).astype(float)))
+
+                    if np.any(sp_sh_mask):
+                        sp_all = data['SP'][sp_sh_mask].astype(float)
+                        sh_all = data['SH'][sp_sh_mask].astype(float)
+                        ot_all = data['OT'][sp_sh_mask].astype(int)
+                        side_all = data['is_driver_side'][sp_sh_mask].astype(int)
+
+                        outside_count = 0
+                        examples = []
+                        for (side_val, ot_val), poly in SEAT_POLYS.items():
+                            sel = (side_all == side_val) & (ot_all == ot_val)
+                            if not np.any(sel):
+                                continue
+                            pts = np.column_stack((sp_all[sel], sh_all[sel]))
+                            path = Path(poly)
+                            contains = path.contains_points(pts)
+                            if not np.all(contains):
+                                n_bad = np.sum(~contains)
+                                outside_count += int(n_bad)
+                                # collect up to 3 example points
+                                bad_idx = np.where(sel)[0][~contains]
+                                for bi in bad_idx[:3]:
+                                    examples.append((int(side_val), int(ot_val), float(pts[bi,0]), float(pts[bi,1])))
+
+                        is_polygon_ok = (outside_count == 0)
+                        print(f"  - 检查 (SP,SH) 是否位于允许多边形内: {'通过' if is_polygon_ok else '失败!!!!!!!'}")
+                        if not is_polygon_ok:
+                            print(f"    多边形外样本数: {outside_count}; 示例 (side,OT,SP,SH): {examples[:3]}")
+                        verification_results['SP_SH_polygon'] = is_polygon_ok
+                        all_checks_passed &= is_polygon_ok
+                except Exception as _e:
+                    print(f"  - 多边形包含检查失败（跳过）: {_e}")
+
+        # -------------------- 新增：SH（座椅高度）按 OT 与主/副驾的分段范围校验 --------------------
+        if 'SH_vs_OT_side' in special_checks and 'SH' in data and 'OT' in data and 'is_driver_side' in data:
+            sh_data = data['SH']
+            ot_data = data['OT']
+            side_data = data['is_driver_side']
+            valid_mask = ~(np.isnan(sh_data) | np.isnan(ot_data) | np.isnan(side_data))
+            
+            if np.any(valid_mask):
+                sh_valid = sh_data[valid_mask]
+                ot_valid = ot_data[valid_mask].astype(int)
+                side_valid = side_data[valid_mask].astype(int)
+
+                # 从采样端 SEAT_CONSTRAINTS 推断的每组 (is_driver_side, OT) 的 SH 最小/最大值（mm）
+                SH_RANGES = {
+                    (1, 1): (0.0, 60.0),    # 主驾 5th
+                    (1, 2): (-3.0, 60.0),   # 主驾 50th
+                    (1, 3): (-10.0, 70.0),  # 主驾 95th
+                    (0, 1): (-10.0, 70.0),  # 副驾 5th
+                    (0, 2): (-10.0, 70.0),  # 副驾 50th
+                    (0, 3): (-10.0, 70.0),  # 副驾 95th
+                }
+
+                is_sh_valid = True
+                failed_details = []
+                for (side_val, ot_val), (sh_min, sh_max) in SH_RANGES.items():
+                    mask = (side_valid == side_val) & (ot_valid == ot_val)
+                    if np.any(mask):
+                        block = sh_valid[mask]
+                        ok = np.all((block >= sh_min) & (block <= sh_max))
+                        is_sh_valid &= ok
+                        if not ok:
+                            failed_count = np.sum((block < sh_min) | (block > sh_max))
+                            failed_details.append(((side_val, ot_val), failed_count, sh_min, sh_max))
+
+                print(f"  - 检查 'SH' 与体型和主副驾的对应关系: {'通过' if is_sh_valid else '失败!!!!!!!'}")
+                if not is_sh_valid:
+                    for (side_val, ot_val), cnt, smin, smax in failed_details:
+                        side_s = '主驾' if side_val == 1 else '副驾'
+                        print(f"    不满足 ({side_s}, OT={ot_val}) 的样本数: {cnt}，允许范围: [{smin}, {smax}] mm")
+
+                verification_results['SH_vs_OT_side'] = is_sh_valid
+                all_checks_passed &= is_sh_valid
         
         # 检查 RA 与主副驾的关系
         if 'RA_vs_side' in special_checks and 'RA' in data and 'is_driver_side' in data:
@@ -438,21 +557,21 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
     if flag == 'MADYMO':
         print("\n--- 关键区间样本比例统计 ---")
         
-        # LL1关键区间统计：[3.0, 5.0] kN
+        # LL1关键区间统计：[1.5, 3.0] kN
         if 'LL1' in data:
             ll1_data = data['LL1'][~np.isnan(data['LL1'].astype(float))]
             if len(ll1_data) > 0:
-                ll1_in_key_range = np.sum((ll1_data >= 3.0) & (ll1_data <= 5.0))
+                ll1_in_key_range = np.sum((ll1_data >= 1.5) & (ll1_data <= 3.0))
                 ll1_key_ratio = ll1_in_key_range / len(ll1_data) * 100
-                print(f"  LL1 在 [3.0, 5.0] kN 区间的样本比例: {ll1_key_ratio:.2f}% ({ll1_in_key_range}/{len(ll1_data)})")
+                print(f"  LL1 在 [1.5, 3.0] kN 区间的样本比例: {ll1_key_ratio:.2f}% ({ll1_in_key_range}/{len(ll1_data)})")
         
-        # LL2关键区间统计：[1.5, 3.0] kN
+        # LL2关键区间统计：[0.5, 1.5] kN
         if 'LL2' in data:
             ll2_data = data['LL2'][~np.isnan(data['LL2'].astype(float))]
             if len(ll2_data) > 0:
-                ll2_in_key_range = np.sum((ll2_data >= 1.5) & (ll2_data <= 3.0))
+                ll2_in_key_range = np.sum((ll2_data >= 0.5) & (ll2_data <= 1.5))
                 ll2_key_ratio = ll2_in_key_range / len(ll2_data) * 100
-                print(f"  LL2 在 [1.5, 3.0] kN 区间的样本比例: {ll2_key_ratio:.2f}% ({ll2_in_key_range}/{len(ll2_data)})")
+                print(f"  LL2 在 [0.5, 1.5] kN 区间的样本比例: {ll2_key_ratio:.2f}% ({ll2_in_key_range}/{len(ll2_data)})")
         
         # LLATTF=150ms统计（代表不切换二级限力）
         if 'LLATTF' in data:
@@ -502,9 +621,9 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
                             bins = np.arange(-1.0, 1.1, 0.1)
                     elif flag == 'MADYMO':
                         if param == 'LL1':
-                            bins = np.arange(2.0, 7.5, 0.5)
+                            bins = np.arange(1.0, 7.5, 0.5)
                         elif param == 'LL2':
-                            bins = np.arange(1.5, 5.0, 0.3)
+                            bins = np.arange(0.5, 5.0, 0.5)
                         elif param in ['BTF', 'AFT', 'LLATTF', 'PTF']:
                             bins = np.arange(10, 160, 10)
                         elif param == 'SP':
@@ -518,19 +637,19 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
                 # ==================== 在图中标注关键区间比例 ====================
                 if flag == 'MADYMO':
                     if param == 'LL1':
-                        # 标注 [3.0, 5.0] kN 区间比例
-                        ll1_in_range = np.sum((param_data >= 3.0) & (param_data <= 5.0))
+                        # 标注 [1.5, 3.0] kN 区间比例
+                        ll1_in_range = np.sum((param_data >= 1.5) & (param_data <= 3.0))
                         ll1_ratio = ll1_in_range / len(param_data) * 100
                         # 绘制关键区间背景
-                        axes1[i].axvspan(3.0, 5.0, alpha=0.2, color='red', label=f'[3.0,5.0]kN: {ll1_ratio:.1f}%')
+                        axes1[i].axvspan(1.5, 3.0, alpha=0.2, color='red', label=f'[1.5,3.0]kN: {ll1_ratio:.1f}%')
                         axes1[i].legend(loc='upper right', fontsize=8)
                     
                     elif param == 'LL2':
-                        # 标注 [1.5, 3.0] kN 区间比例
-                        ll2_in_range = np.sum((param_data >= 1.5) & (param_data <= 3.0))
+                        # 标注 [0.5, 1.5] kN 区间比例
+                        ll2_in_range = np.sum((param_data >= 0.5) & (param_data <= 1.5))
                         ll2_ratio = ll2_in_range / len(param_data) * 100
                         # 绘制关键区间背景
-                        axes1[i].axvspan(1.5, 3.0, alpha=0.2, color='red', label=f'[1.5,3.0]kN: {ll2_ratio:.1f}%')
+                        axes1[i].axvspan(0.5, 1.5, alpha=0.2, color='red', label=f'[0.5,1.5]kN: {ll2_ratio:.1f}%')
                         axes1[i].legend(loc='upper right', fontsize=8)
                     
                     elif param == 'LLATTF':
@@ -541,6 +660,46 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
                         axes1[i].axvline(x=150, color='red', linestyle='--', linewidth=2, label=f'150ms(不切换): {llattf_150_ratio:.1f}%')
                         axes1[i].legend(loc='upper right', fontsize=8)
 
+                # -------------------- 新增：SP/SH/RA 按主/副驾与按 OT 的分组分布图 --------------------
+                if flag == 'MADYMO' and param in ('SP', 'SH', 'RA'):
+                    try:
+                        df_plot = pd.DataFrame({
+                            param: data[param].astype(float),
+                            'is_driver_side': data.get('is_driver_side', np.full(len(data[param]), np.nan)).astype(float),
+                            'OT': data.get('OT', np.full(len(data[param]), np.nan)).astype(float)
+                        })
+                        df_plot = df_plot.dropna(subset=[param])
+
+                        # 按主/副驾叠加（RA 为离散，使用 countplot）
+                        fig_a, ax_a = plt.subplots(1, 1, figsize=(6, 4))
+                        if param == 'RA':
+                            sns.countplot(x=param, hue='is_driver_side', data=df_plot, ax=ax_a, palette='Set2')
+                            ax_a.set_ylabel('count')
+                        else:
+                            sns.histplot(data=df_plot, x=param, hue='is_driver_side', kde=False, stat='density', bins=20, ax=ax_a, palette='Set2', alpha=0.6)
+                            ax_a.set_ylabel('density')
+                        ax_a.set_title(f'{param} distributions by side')
+                        side_filename = os.path.join(output_dir, f'{flag}_{param}_by_side.png')
+                        fig_a.tight_layout()
+                        fig_a.savefig(side_filename, dpi=300, bbox_inches='tight')
+                        plt.close(fig_a)
+
+                        # 按 OT 分面显示（若 OT 存在且非全 NaN）
+                        if not df_plot['OT'].isna().all():
+                            g = sns.FacetGrid(df_plot, col='OT', col_wrap=3, height=3.2, sharex=True, sharey=False)
+                            if param == 'RA':
+                                g.map(sns.countplot, param, order=sorted(df_plot[param].unique()))
+                            else:
+                                g.map(sns.histplot, param, kde=False, bins=20)
+                            ot_filename = os.path.join(output_dir, f'{flag}_{param}_by_OT.png')
+                            plt.subplots_adjust(top=0.9)
+                            g.fig.suptitle(f'{param} distributions by OT')
+                            g.fig.savefig(ot_filename, dpi=300, bbox_inches='tight')
+                            plt.close(g.fig)
+
+                        print(f"  - 已保存按主/副驾与按OT分组的 {param} 分布图: {side_filename}, {ot_filename if 'ot_filename' in locals() else '(no OT plot)'}")
+                    except Exception as e:
+                        print(f"  - 绘制 {param} 分组分布图失败: {e}")
         for i in range(n_params, len(axes1)):
             axes1[i].set_visible(False)
         
@@ -582,6 +741,72 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
                 axes2[i].set_xlabel(param1)
                 axes2[i].set_ylabel(param2)
                 axes2[i].grid(True, alpha=0.3)
+
+                # 如果是 SP vs SH 且为 MADYMO：
+                # - 仅绘制数据中实际出现的 (is_driver_side, OT) 对应的多边形，避免过度叠加造成视觉干扰
+                # - 在多边形顶点绘制小点并标注顶点序号（简短坐标可选）以便人工核查
+                if flag == 'MADYMO' and ((param1 == 'SP' and param2 == 'SH') or (param1 == 'SH' and param2 == 'SP')):
+                    try:
+                        SEAT_POLYS = {
+                            (1, 1): [(40, 0), (110, 5.5), (110, 60), (80, 60), (80, 30), (40, 30)],
+                            (1, 2): [(-40, -2.2), (60, 3.3), (60, 60), (-40, 60)],
+                            (1, 3): [(-110, -10), (20, -10), (20, 70), (-110, 70)],
+                            (0, 1): [(-110, -10), (110, -10), (110, 70), (-110, 70)],
+                            (0, 2): [(-110, -10), (110, -10), (110, 70), (-110, 70)],
+                            (0, 3): [(-110, -10), (49, -10), (49, 70), (-110, 70)],
+                        }
+
+                        # 获取当前绘图中实际存在的 (side, OT) 组合 —— 仅绘制这些多边形
+                        side_arr = data.get('is_driver_side', np.full(len(data[first_param]), np.nan)).astype(float)
+                        ot_arr = data.get('OT', np.full(len(data[first_param]), np.nan)).astype(float)
+                        sp_arr = data.get('SP', np.full(len(data[first_param]), np.nan)).astype(float)
+                        sh_arr = data.get('SH', np.full(len(data[first_param]), np.nan)).astype(float)
+
+                        mask_pairs = valid_mask.copy() if 'valid_mask' in locals() else (~np.isnan(sp_arr) & ~np.isnan(sh_arr))
+                        present_pairs = set()
+                        if np.any(mask_pairs):
+                            side_sel = side_arr[mask_pairs].astype(int)
+                            ot_sel = ot_arr[mask_pairs].astype(int)
+                            for s, o in zip(side_sel, ot_sel):
+                                if (int(s), int(o)) in SEAT_POLYS:
+                                    present_pairs.add((int(s), int(o)))
+
+                        # If no specific pairs present, draw only the most-relevant polygon (OT where data exists) or skip
+                        if len(present_pairs) == 0:
+                            # try to infer OT from data values near the plotted region
+                            uniq_ot = np.unique(ot_arr[~np.isnan(ot_arr)])
+                            for otv in uniq_ot:
+                                for sv in (1, 0):
+                                    if (sv, int(otv)) in SEAT_POLYS:
+                                        present_pairs.add((sv, int(otv)))
+                                        break
+
+                        colors = plt.cm.Set2.colors
+                        color_map = {}
+                        for idx, pair in enumerate(sorted(present_pairs)):
+                            color_map[pair] = colors[idx % len(colors)]
+
+                        for pair, poly in SEAT_POLYS.items():
+                            if pair not in present_pairs:
+                                continue
+                            poly = np.array(poly)
+                            col = color_map.get(pair, 'C3')
+                            # 多边形边界
+                            axes2[i].plot(np.append(poly[:,0], poly[0,0]), np.append(poly[:,1], poly[0,1]),
+                                          linestyle='--', color=col, linewidth=1.2, alpha=0.9,
+                                          label=f'side={pair[0]},OT={pair[1]}')
+                            # 顶点标注（index + 简短坐标）
+                            for vi, (vx, vy) in enumerate(poly):
+                                axes2[i].scatter(vx, vy, marker='o', s=18, color=col, edgecolor='black', zorder=5)
+                                axes2[i].text(vx, vy, f'{vi}', fontsize=7, color=col, va='bottom', ha='right', zorder=6)
+
+                        # 图例（仅当至少绘制了 1 个多边形时）
+                        if len(present_pairs) > 0:
+                            axes2[i].legend(title='Seat poly (side,OT)', fontsize=8, title_fontsize=9, loc='upper left')
+
+                        print(f"  - 绘制 seat-polygons（仅针对数据中存在的组合）: {sorted(present_pairs)}")
+                    except Exception as _e:
+                        print(f"  - 绘制 seat-polygons 失败: {_e}")
         
         for i in range(n_pairs, len(axes2)):
             axes2[i].set_visible(False)
@@ -639,9 +864,9 @@ if __name__ == '__main__':
     
     # MADYMO验证
     verify_and_visualize_params(
-        r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0123.csv',
+        r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0206.csv',
         flag='MADYMO',
-        output_dir='MADYMO_sample_verification_0130',
+        output_dir='MADYMO_sample_verification_0206',
         param_pairs=[
             ('LL1', 'LL2'),
             ('BTF', 'LLATTF'),
@@ -650,6 +875,10 @@ if __name__ == '__main__':
             ('OT', 'DZ'),
             ('OT', 'SP'),
             ('OT', 'RA'),
+            ('is_driver_side', 'SP'),
+            ('is_driver_side', 'SH'),
+            ('is_driver_side', 'RA'),
+            ('SP', 'SH')
         ]
     )
 
@@ -905,9 +1134,9 @@ elif new_distribution_path.endswith('.csv'):
 # %% -Final.将头颈胸损伤标签（HIC15, Dmax, Nij）添加到distribution文件中
 import numpy as np
 import pandas as pd
-distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0112.csv'
-new_distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0113.csv'
-Injury_labels_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\Injury_labels_0112_40.xlsx'
+distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0130.csv'
+new_distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0205.csv'
+Injury_labels_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\Injury_labels_0205.xlsx'
 # 读取distribution文件
 if distribution_path.endswith('.npz'):
     distribution_npz = np.load(distribution_path, allow_pickle=True)
@@ -968,8 +1197,8 @@ elif new_distribution_path.endswith('.csv'):
 # %% 将指定case_id的损伤标签改为False 或 NaN
 import numpy as np
 import pandas as pd
-distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0114_V2.csv'
-new_distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0121.csv'
+distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0205.csv'
+new_distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0205_.csv'
 # 读取distribution文件
 if distribution_path.endswith('.npz'):
     distribution_npz = np.load(distribution_path, allow_pickle=True)
@@ -983,7 +1212,8 @@ elif distribution_path.endswith('.csv'):
 else:
     raise ValueError("Unsupported distribution file format. Use .csv or .npz")
 # 需要更新的case_id列表
-case_ids_to_update = [52145, 54284, 53844, 53448, 53641, 56952, 50813, 54254, 57034, 53690, 55617, 51667, 51970, 53044, 54957, 53176, 56323, 54196, 54921, 55707]
+# case_ids_to_update = [52145, 54284, 53844, 53448, 53641, 56952, 50813, 54254, 57034, 53690, 55617, 51667, 51970, 53044, 54957, 53176, 56323, 54196, 54921, 55707]
+case_ids_to_update = [7865]
 for case_id in case_ids_to_update:
     if case_id in distribution_df.index:
         distribution_df.at[case_id, 'is_injury_ok'] = False  # nan or False

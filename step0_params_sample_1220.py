@@ -343,7 +343,7 @@ def create_piecewise_sampler(histogram_data):
     参数:
     - histogram_data: 列表，每个元素为 [区间下限, 区间上限, 相对密度]
       - 相对密度表示该区间的采样密度，值越大该区间被采样的概率越高
-      - 实际概率 = (区间宽度 × 相对密度) / (所有区间面积之和)
+      - 实际落在某区间的概率 = (区间面积) / (所有区间面积之和)，区间面积=(区间宽度)×(相对密度)
       - 例如：[2.0, 3.0, 80.0] 表示在 [2.0, 3.0) 区间的相对密度为 80.0
     
     返回:
@@ -418,13 +418,13 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
     # ==================== 定义参数采样维度 ====================
     param_dims = {
         'OT':            0,   # 乘员体型 [1, 2, 3]
-        'LL1':           1,   # 一级限力值 [2.0, 7.0] kN，非均匀采样
-        'LL2':           2,   # 二级限力值 [1.5, 4.5] kN，非均匀采样
+        'LL1':           1,   # 一级限力值 [1.0, 7.0] kN，非均匀采样
+        'LL2':           2,   # 二级限力值 [0.5, 4.5] kN，非均匀采样
         'BTF':           3,   # 预紧器点火时刻（用于备用采样）
         'LLATTF_offset': 4,   # 二级限力切换时间偏移 [0, 100] ms
         'AFT':           5,   # 气囊点火时刻 [10, 100] ms
         'SP':            6,   # 座椅前后位置（归一化采样，后续根据体型和主副驾映射）
-        'SH':            7,   # 座椅高度（归一化采样，后续根据体型和主副驾映射）[NEW]
+        'SH':            7,   # 座椅高度（归一化采样，后续根据体型和主副驾映射）
         'RA':            8,   # 座椅靠背角度（归一化采样，后续离散化）
     }
     
@@ -440,22 +440,23 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
     # 拒绝采样用的独立随机数生成器
     rejection_rng = np.random.Generator(np.random.PCG64(seed + 666))
     
-    # LL1非均匀采样器：[3.0, 5.0] kN 区间加权到75%~80%
+    # LL1非均匀采样器（20260205额外加权调整）
     ll1_histogram_data = [
-        [2.0, 3.0, 8.0], 
-        [3.0, 4.0, 35.0],
-        [4.0, 5.0, 40.0], 
-        [5.0, 6.0, 10.0],
-        [6.0, 7.0, 7.0],
+        [1.0, 1.5, 30.0], 
+        [1.5, 2.0, 84.0],
+        [2.0, 2.5, 45.0],
+        [2.5, 3.0, 30.0], 
+        [3.0, 4.5, 4.0],
+        [4.5, 7.0, 2.0],
     ]
     ll1_sampler = create_piecewise_sampler(ll1_histogram_data)
     
-    # LL2非均匀采样器：[1.5, 3.0] kN 区间加权到75~80%
+    # LL2非均匀采样器（20260205额外加权调整）
     ll2_histogram_data = [
-        [1.5, 2.0, 30.0], 
-        [2.0, 3.0, 40.0], 
-        [3.0, 4.0, 17.0], 
-        [4.0, 4.5, 13.0],
+        [0.5, 1.5, 65.0], 
+        [1.5, 2.7, 20.0], 
+        [2.7, 3.0, 5.0], 
+        [3.0, 4.5, 3.0],
     ]
     ll2_sampler = create_piecewise_sampler(ll2_histogram_data)
     
@@ -475,13 +476,12 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
     existing_ot_map = dict(zip(existing_data['case_id'], existing_data['OT']))
     
     # ==================== 定义SP和SH的范围约束 (SP, SH) ====================
-    # 6组采样约束区域，每组由4个点定义的梯形组成 [(SP1, SH1), (SP2, SH2), (SP3, SH3), (SP4, SH4)]
-    # 请在此处修改具体的四个坐标点
-    # 默认SH范围近似 -10 ~ 70 mm
+    # 6组采样约束区域，每组由多干个点定义的多边形组成 [(SP1, SH1), (SP2, SH2), (SP3, SH3), (SP4, SH4).....]
+    # 默认SH范围近似 -110/18 ~ 60 mm
     SEAT_CONSTRAINTS = {
         # (is_driver_side [1=Main, 0=Pass], OT [1=5th, 2=50th, 3=95th])
-        (1, 1): [(20, -10), (110, -10), (110, 70), (20, 70)],      # 主驾 5th
-        (1, 2): [(-40, -40/18), (60, 60/18), (60, 60), (-40, 60)],      # 主驾 50th ; 0122调整
+        (1, 1): [(40, 0), (110, 110/20), (110, 60), (80, 60), (80, 30), (40, 30)], # 主驾 5th; 0205调整
+        (1, 2): [(-40, -40/18), (60, 60/18), (60, 60), (-40, 60)], # 主驾 50th ; 0122调整
         (1, 3): [(-110, -10), (20, -10), (20, 70), (-110, 70)],    # 主驾 95th
         (0, 1): [(-110, -10), (110, -10), (110, 70), (-110, 70)],  # 副驾 5th
         (0, 2): [(-110, -10), (110, -10), (110, 70), (-110, 70)],  # 副驾 50th
@@ -490,8 +490,12 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
     
     # RA离散值：主驾 [15, 20, 25, 30]°，副驾 [20, 25, 30, 35, 40]°
     RA_VALUES = {
-        1: np.array([15, 20, 25, 30]),  # 主驾 20260114调整
-        0: np.array([20, 25, 30, 35, 40]),  # 副驾
+        (1, 1): [15, 20, 25], # 主驾 5th ；0205调整
+        (1, 2): [15, 20, 25, 30], # 主驾 50th
+        (1, 3): [15, 20, 25, 30],    # 主驾 95th
+        (0, 1): [20, 25, 30, 35, 40],  # 副驾 5th
+        (0, 2): [20, 25, 30, 35, 40],  # 副驾 50th
+        (0, 3): [20, 25, 30, 35, 40],    # 副驾 95th
     }
     # ==================== 定义DZ与OT的映射 ====================
     # DZ与OT的映射关系
@@ -526,10 +530,8 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
             # 保持原值
             ot_val = existing_ot_map.get(case_id, np.nan)
             if pd.isna(ot_val):
-                # 如果原值为NaN，回退到采样逻辑
-                ot_continuous = ot_sampler(sample[param_dims['OT']]) 
-                ot_val = int(np.floor(ot_continuous)) + 1
-                ot_val = max(min(ot_val, 3), 1)
+                # 如果原值为NaN，则报错
+                raise ValueError(f"Case ID {case_id} has NaN OT value, cannot keep original OT.")
             else:
                 ot_val = int(ot_val)
                 
@@ -593,7 +595,7 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
         results['AFT'].append(float(aft_val))
         
         # -------------------- 座椅前后位置 SP & 座椅高度 SH (耦合约束) --------------------
-        # 获取当前工况的约束多边形顶点
+        # 根据主副驾和体型获取对应的SP-SH约束多边形顶点列表
         poly_points = SEAT_CONSTRAINTS.get((int(is_driver_side), ot_val))
         if poly_points is None:
             # 默认全范围兜底
@@ -618,7 +620,7 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
         results['SH'].append(float(sh_val))
         
         # -------------------- 座椅靠背角度 RA (离散化采样，区分主副驾) --------------------
-        ra_options = RA_VALUES.get(int(is_driver_side), RA_VALUES[1])
+        ra_options = RA_VALUES.get((int(is_driver_side), ot_val)) # 根据主副驾和体型获取对应的RA选项列表
         # 将[0,1)均匀样本映射到离散档位
         ra_idx = int(np.floor(sample[param_dims['RA']] * len(ra_options)))
         ra_idx = max(min(ra_idx, len(ra_options) - 1), 0)  # 确保索引不越界,在0到len-1之间
@@ -653,8 +655,8 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
 
 # ==================== 主程序入口 ====================
 if __name__ == '__main__':
-    distribution_file = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0121.csv'
-    new_filename = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0122.csv'
+    distribution_file = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0205.csv'
+    new_filename = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0206.csv'
     
     # 读取需要填充的case_id列表，可选只采样主驾侧的或副驾侧的
     # 条件：is_pulse_ok为True 且 OT 满足特定条件
@@ -665,15 +667,15 @@ if __name__ == '__main__':
         df = pd.read_csv(distribution_file)
         if driver_side_only is not None:
             df = df[df['is_driver_side'] == driver_side_only]
-        # 只采样 is_pulse_ok 为 True 且 OT 为2（50th假人）的case_id
-        case_ids_to_fill = df[(df['is_pulse_ok'] == True) & (df['OT']==2)]['case_id'].tolist()
+        # 只采样 is_pulse_ok 为 True 且 OT 为某个值的case_id
+        case_ids_to_fill = df[(df['is_pulse_ok'] == True) & (df['OT']==1)]['case_id'].tolist()
     elif distribution_file.endswith('.npz'):
         with np.load(distribution_file) as data:
             df = pd.DataFrame({key: data[key] for key in data.files})
             if driver_side_only is not None:
                 df = df[df['is_driver_side'] == driver_side_only]
-            # 只采样 is_pulse_ok 为 True 且 OT 为2（50th假人）的case_id
-            case_ids_to_fill = df[(df['is_pulse_ok'] == True) & (df['OT']==2)]['case_id'].tolist()
+            # 只采样 is_pulse_ok 为 True 且 OT 为某个值的case_id
+            case_ids_to_fill = df[(df['is_pulse_ok'] == True) & (df['OT']==1)]['case_id'].tolist()
     else:
         raise ValueError("Unsupported file format.")
     if driver_side_only == 1:
@@ -693,8 +695,8 @@ if __name__ == '__main__':
             filename=distribution_file,
             new_filename=new_filename,
             case_ids=case_ids_to_fill,
-            skip_points=8192,
-            seed=20260122,
+            skip_points=16384,
+            seed=20260205,
             sample_ot=sample_ot_flag
         )
     else:
