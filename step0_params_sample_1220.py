@@ -443,18 +443,18 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
     # LL1非均匀采样器（20260205额外加权调整）
     ll1_histogram_data = [
         [1.0, 1.5, 30.0], 
-        [1.5, 2.0, 84.0],
+        [1.5, 2.0, 75.0],
         [2.0, 2.5, 45.0],
-        [2.5, 3.0, 30.0], 
-        [3.0, 4.5, 4.0],
-        [4.5, 7.0, 2.0],
+        [2.5, 3.0, 45.0], 
+        [3.0, 4.5, 5.0],
+        [4.5, 7.0, 2.5],
     ]
     ll1_sampler = create_piecewise_sampler(ll1_histogram_data)
     
     # LL2非均匀采样器（20260205额外加权调整）
     ll2_histogram_data = [
-        [0.5, 1.5, 65.0], 
-        [1.5, 2.7, 20.0], 
+        [0.5, 1.5, 60.0], 
+        [1.5, 2.7, 25.0], 
         [2.7, 3.0, 5.0], 
         [3.0, 4.5, 3.0],
     ]
@@ -655,8 +655,8 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
 
 # ==================== 主程序入口 ====================
 if __name__ == '__main__':
-    distribution_file = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0205.csv'
-    new_filename = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0206.csv'
+    distribution_file = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0123_V2.csv'
+    new_filename = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0205.csv'
     
     # 读取需要填充的case_id列表，可选只采样主驾侧的或副驾侧的
     # 条件：is_pulse_ok为True 且 OT 满足特定条件
@@ -696,7 +696,7 @@ if __name__ == '__main__':
             new_filename=new_filename,
             case_ids=case_ids_to_fill,
             skip_points=16384,
-            seed=20260205,
+            seed=20260206,
             sample_ot=sample_ot_flag
         )
     else:

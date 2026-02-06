@@ -962,3 +962,42 @@ if __name__ == '__main__':
     old_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1112.csv'
     new_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1207V0.csv'
     clean_distribution_for_madymo_resampling(old_path, new_path)
+
+# %% 删除distribution 指定的参数列中的采样值
+import numpy as np
+import pandas as pd
+distribution_path = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0123.csv'
+new_distribution_path = r'\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0123_V2.csv'
+# 读取distribution文件
+if distribution_path.endswith('.npz'):
+    distribution_npz = np.load(distribution_path, allow_pickle=True)
+    distribution_df = pd.DataFrame({
+            key: distribution_npz[key]
+            for key in distribution_npz.files
+        }).set_index('case_id', drop=False)
+elif distribution_path.endswith('.csv'):
+    distribution_df = pd.read_csv(distribution_path)
+    distribution_df.set_index('case_id', inplace=True, drop=False)
+else:
+    raise ValueError("Unsupported distribution file format. Use .csv or .npz")
+
+# 主驾5分位（OT=1) 和95分位(OT=3)的LL1	LL2	BTF	LLATTF	DZ	PTF	AFT	SP	SH	RA 均清空
+params_to_clear = ['LL1', 'LL2', 'BTF', 'LLATTF', 'DZ', 'PTF', 'AFT', 'SP', 'SH', 'RA']
+for param in params_to_clear:
+    mask_clear = ((distribution_df['is_driver_side'] == 1) & (distribution_df['OT'] == 1)) | ((distribution_df['is_driver_side'] == 1) & (distribution_df['OT'] == 3))
+    distribution_df.loc[mask_clear, param] = np.nan
+    print(f"Cleared values of {param} for driver side OT=1 and OT=3.")
+# 主驾50th的LL1 LL2这两列的值清空
+params_to_clear = ['LL1', 'LL2']
+for param in params_to_clear:
+    mask_clear = (distribution_df['is_driver_side'] == 1) & (distribution_df['OT'] == 2)
+    distribution_df.loc[mask_clear, param] = np.nan
+    print(f"Cleared values of {param} for driver side OT=2.")
+# 保存更新后的distribution文件
+if new_distribution_path.endswith('.npz'):
+    np.savez(new_distribution_path, **{col: distribution_df[col].values for col in distribution_df.columns})
+elif new_distribution_path.endswith('.csv'):
+    distribution_df.to_csv(new_distribution_path, index=False)
+    print("Updated distribution file with cleared parameter values has been saved.")
+# %%
+# %%

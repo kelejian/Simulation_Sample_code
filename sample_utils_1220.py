@@ -1229,5 +1229,3 @@ if new_distribution_path.endswith('.npz'):
 elif new_distribution_path.endswith('.csv'):
     distribution_df.to_csv(new_distribution_path, index=False)
     print("Updated distribution file with injury labels has been saved.")
-# %%
-# %%

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-MADYMO XML 自动化生成脚本 (Step 3 - 1220 Version)
+MADYMO XML 自动化生成脚本 (Step 3 - 20260122 版本)
 --------------------------------------------------
 功能：
 1. 读取 distribution.csv 参数矩阵。
@@ -22,13 +22,13 @@ import copy
 # 格式: '{驾驶侧}_{假人体型}'
 # 可选: 'DS_5th', 'DS_50th', 'DS_95th', 'PS_5th', 'PS_50th', 'PS_95th'
 # =================================*****===================================
-XML_TYPE = 'DS_50th'
+XML_TYPE = 'DS_5th'
 # =================================*****===================================
 # --- 路径配置 ---
 # 请根据实际环境确认以下路径
 BASE_XML_DIR = r'D:\MADYMO_xml文件'
 # =================================*****===================================
-PARAM_FILE_PATH = r'I:\000 LX\dataset0715\03\distribution_0122.csv'
+PARAM_FILE_PATH = r'I:\000 LX\dataset0715\03\distribution_0206.csv'
 # =================================*****===================================
 PULSE_FILES_DIR = r'I:\000 LX\dataset0715\03\acc_data_before1111_6134'
 OUTPUT_DIR = os.path.join(BASE_XML_DIR, XML_TYPE)
@@ -36,8 +36,8 @@ OUTPUT_DIR = os.path.join(BASE_XML_DIR, XML_TYPE)
 # --- Base XML 文件映射 ---
 # =================================*****===================================
 BASE_XML_PATHS = {
-    'DS_5th':  os.path.join(BASE_XML_DIR, '主驾-5th假人-base-1220.xml'),
-    'DS_50th': os.path.join(BASE_XML_DIR, '主驾-50th假人-base-V4-0113.xml'),
+    'DS_5th':  os.path.join(BASE_XML_DIR, '主驾-5th假人-base-V3-0205.xml'),
+    'DS_50th': os.path.join(BASE_XML_DIR, '主驾-50th假人-base-V5-0121.xml'),
     'DS_95th': os.path.join(BASE_XML_DIR, '主驾-95th假人-base-1220.xml'),
     'PS_5th':  os.path.join(BASE_XML_DIR, '副驾-5th假人-base-0104.xml'),
     'PS_50th': os.path.join(BASE_XML_DIR, '副驾-50th假人-base-1221.xml'),
@@ -84,7 +84,7 @@ def parse_xml_type(xml_type):
 
 def calc_joint_angles(ot, is_driver, Seat_X_Disp, Seat_Z_Disp, Seat_Back_rotation_Angle):
     """
-    根据xml文件座椅位置 Seat_X_Disp , 座椅高度Seat_Z_Disp , 座椅靠背角度Seat_Back_rotation_Angle和假人类型 OT 计算关节角度 (rad)
+    根据xml文件座椅位置 Seat_X_Disp(m) , 座椅高度Seat_Z_Disp(m) , 座椅靠背角度Seat_Back_rotation_Angle(rad) 和假人类型 OT 计算关节角度(rad)
     """
     if is_driver == 0: # 副驾PS
         # 初始化
@@ -127,10 +127,187 @@ def calc_joint_angles(ot, is_driver, Seat_X_Disp, Seat_Z_Disp, Seat_Back_rotatio
                 
     if is_driver == 1: # 主驾DS
         # 初始化8个假人关节角度
-        hipL, hipR, ankleL, ankleR, elbow, shoulder, kneeL, kneeR = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        hipL, hipR, AnkleL, AnkleR, elbow, shoulder, kneeL, kneeR = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
         # --- 主驾5th假人 (OT=1) ---
         if ot == 1:
-            raise NotImplementedError("主驾5th假人关节角度计算未实现")
+            if Seat_Z_Disp <= 0.03:
+
+                x = Seat_X_Disp / 0.1
+                z = Seat_Z_Disp / 0.1
+                A = Seat_Back_rotation_Angle
+                sinA = np.sin(A)
+                cosA = np.cos(A)                
+
+                # (1) hipL_angle   R²=0.943
+                hipL = (
+                    -0.259212
+                    - 1.436109*x - 0.414419*z + 6.555674*x*z
+                    - 1.666517*sinA + 0.363335*cosA
+                    + 0.607384*x*sinA + 1.319137*x*cosA
+                    + 2.431542*z*sinA + 0.982561*z*cosA
+                    - 2.480724*x*z*sinA - 6.811193*x*z*cosA
+                )
+
+                # (2) kneeL_angle  R²=0.802
+                kneeL = (
+                    2.990427
+                    - 1.118961*x + 29.925925*z - 19.203624*x*z
+                    + 0.528269*sinA - 2.907787*cosA
+                    - 0.311200*x*sinA + 1.238635*x*cosA
+                    - 7.883337*z*sinA - 31.191876*z*cosA
+                    + 7.230564*x*z*sinA + 19.878176*x*z*cosA
+                )
+
+                # (3) AnkleL_angle R²=0.764
+                AnkleL = (
+                    7.093497
+                    - 1.892864*x - 187.764977*z + 119.438948*x*z
+                    + 0.487504*sinA - 6.425926*cosA
+                    - 1.049344*x*sinA + 1.523374*x*cosA
+                    + 2.693904*z*sinA + 188.035787*z*cosA
+                    - 1.784960*x*z*sinA - 119.509369*x*z*cosA
+                )
+
+                # (4) hipR_angle   R²=0.998
+                hipR = (
+                    3.980650
+                    - 3.558642*x - 5.056427*z + 5.320563*x*z
+                    - 1.577204*sinA - 3.711162*cosA
+                    + 0.310685*x*sinA + 3.354325*x*cosA
+                    + 0.418618*z*sinA + 5.426328*z*cosA
+                    - 0.375501*x*z*sinA - 5.386509*x*z*cosA
+                )
+
+                # (5) kneeR_angle  R²=0.997
+                kneeR = (
+                    -6.864789
+                    + 5.863100*x + 21.445177*z - 18.562829*x*z
+                    + 1.154641*sinA + 6.331442*cosA
+                    - 0.513115*x*sinA - 5.330949*x*cosA
+                    - 1.338176*z*sinA - 21.987889*z*cosA
+                    + 1.176342*x*z*sinA + 18.790870*x*z*cosA
+                )
+
+                # (6) AnkleR_angle R²=0.990
+                AnkleR = (
+                    -0.722018
+                    + 1.288186*x - 5.281417*z + 6.344441*x*z
+                    - 0.281222*sinA + 1.367993*cosA
+                    - 0.019368*x*sinA - 1.657844*x*cosA
+                    - 0.875387*z*sinA + 5.364009*z*cosA
+                    + 0.443106*x*z*sinA - 6.438599*x*z*cosA
+                )
+
+                # (7) shoulder_angle R²=0.958
+                shoulder = (
+                    5.387519
+                    - 6.272059*x + 105.990980*z - 80.865044*x*z
+                    + 2.170030*sinA - 6.756160*cosA
+                    - 0.593709*x*sinA + 6.626770*x*cosA
+                    - 10.168768*z*sinA - 105.863349*z*cosA
+                    + 7.939414*x*z*sinA + 80.784567*x*z*cosA
+                )
+
+                # (8) elbow_angle   R²=0.987
+                elbow = (
+                    -6.458139
+                    + 9.050801*x - 207.536031*z + 151.396515*x*z
+                    - 5.548801*sinA + 6.743567*cosA
+                    + 1.054507*x*sinA - 9.826591*x*cosA
+                    + 18.270903*z*sinA + 207.764405*z*cosA
+                    - 13.692283*x*z*sinA - 151.462539*x*z*cosA
+                )
+
+                return hipL, hipR, kneeL, kneeR, AnkleL, AnkleR, shoulder, elbow
+
+            elif Seat_Z_Disp > 0.03:
+                # 使用图中第二套拟合式，先做归一化：
+                X0 = 0.135
+                Z0 = 0.045
+                Lx = 0.0122474487
+                Lz = 0.0122474487
+
+                x = (Seat_X_Disp - X0) / Lx
+                z = (Seat_Z_Disp - Z0) / Lz
+                A = Seat_Back_rotation_Angle
+                sinA = np.sin(A)
+                cosA = np.cos(A)
+
+
+                # (1) hipL_angle
+                hipL = (
+                    0.019624
+                    + 0.004101*x + 0.025627*z - 0.028675*x*z + 0.010651*x**2 + 0.003257*z**2
+                    - 0.899436*sinA + 0.024904*cosA
+                    + 0.159715*x*sinA + 0.069264*z*sinA + 0.012206*x*z*sinA + 0.098215*x**2*sinA - 0.159278*z**2*sinA
+                    - 0.025825*x*cosA + 0.001029*z*cosA + 0.041391*x*z*cosA - 0.018068*x**2*cosA + 0.007834*z**2*cosA
+                )
+
+                # (2) kneeL_angle
+                kneeL = (
+                    0.115138
+                    + 0.002423*x - 0.040681*z + 0.001222*x*z - 0.001202*x**2 + 0.006356*z**2
+                    + 0.174409*sinA - 0.023984*cosA
+                    - 0.268818*x*sinA - 0.186553*z*sinA - 0.139711*x*z*sinA - 0.301926*x**2*sinA + 0.496451*z**2*sinA
+                    + 0.029813*x*cosA - 0.018545*z*cosA - 0.000744*x*z*cosA + 0.010767*x**2*cosA - 0.038366*z**2*cosA
+                )
+
+                # (3) AnkleL_angle
+                AnkleL = (
+                    0.209395
+                    - 0.000092*x + 0.017588*z + 0.001284*x*z + 0.003387*x**2 + 0.002504*z**2
+                    - 0.000994*sinA + 0.000060*cosA
+                    + 0.000929*x*sinA + 0.002427*z*sinA + 0.001162*x*z*sinA - 0.000465*x**2*sinA - 0.000628*z**2*sinA
+                    - 0.000171*x*cosA + 0.017402*z*cosA + 0.001189*x*z*cosA + 0.003405*x**2*cosA + 0.002529*z**2*cosA
+                )
+
+                # (4) hipR_angle
+                hipR = (
+                    0.063132
+                    - 0.014875*x + 0.020137*z - 0.001674*x*z - 0.003378*x**2 - 0.007852*z**2
+                    - 1.044156*sinA + 0.078394*cosA
+                    - 0.003726*x*sinA + 0.001303*z*sinA - 0.008961*x*z*sinA - 0.038028*x**2*sinA - 0.066238*z**2*sinA
+                    + 0.001753*x*cosA + 0.019331*z*cosA + 0.006752*x*z*cosA + 0.003167*x**2*cosA - 0.003275*z**2*cosA
+                )
+
+                # (5) kneeR_angle
+                kneeR = (
+                    0.016663
+                    + 0.018993*x - 0.027955*z - 0.007955*x*z + 0.000399*x**2 + 0.021462*z**2
+                    + 0.162458*sinA - 0.010638*cosA
+                    + 0.006177*x*sinA - 0.027036*z*sinA + 0.011753*x*z*sinA + 0.112348*x**2*sinA + 0.095494*z**2*sinA
+                    + 0.016682*x*cosA - 0.026300*z*cosA - 0.009244*x*z*cosA - 0.005929*x**2*cosA + 0.015234*z**2*cosA
+                )
+
+                # (6) AnkleR_angle
+                AnkleR = (
+                    0.055563
+                    - 0.028833*x - 0.008688*z - 0.004997*x*z + 0.001795*x**2 + 0.012825*z**2
+                    - 0.086284*sinA + 0.005630*cosA
+                    + 0.008231*x*sinA - 0.019149*z*sinA + 0.007959*x*z*sinA - 0.055109*x**2*sinA - 0.072948*z**2*sinA
+                    - 0.029278*x*cosA - 0.006559*z*cosA - 0.005530*x*z*cosA + 0.005609*x**2*cosA + 0.017353*z**2*cosA
+                )
+
+                # (7) shoulder_angle
+                shoulder = (
+                    -0.685468
+                    + 0.083958*x + 0.111727*z + 0.136837*x*z + 0.091186*x**2 + 0.033226*z**2
+                    + 1.068753*sinA - 0.179668*cosA
+                    + 0.150157*x*sinA + 0.031116*z*sinA + 0.038109*x*z*sinA + 0.135667*x**2*sinA + 0.044090*z**2*sinA
+                    - 0.076255*x*cosA - 0.114367*z*cosA - 0.140070*x*z*cosA - 0.085891*x**2*cosA - 0.043803*z**2*cosA
+                )
+
+                # (8) elbow_angle
+                elbow = (
+                    -1.087156
+                    + 0.132255*x - 0.482527*z - 0.410727*x*z - 0.377567*x**2 - 0.148300*z**2
+                    - 3.434315*sinA + 0.395331*cosA
+                    - 0.246067*x*sinA - 0.120419*z*sinA + 0.122573*x*z*sinA - 0.123766*x**2*sinA - 0.137351*z**2*sinA
+                    - 0.180121*x*cosA + 0.527162*z*cosA + 0.401660*x*z*cosA + 0.361690*x**2*cosA + 0.160138*z**2*cosA
+                )
+
+            return hipL, hipR, kneeL, kneeR, AnkleL, AnkleR, shoulder, elbow
+
         # --- 主驾50th假人 (OT=2) ---
         elif ot == 2:
             # 根据公式要求，对X和Z进行归一化处理: x = X/0.1, z = Z/0.1
@@ -153,7 +330,7 @@ def calc_joint_angles(ot, is_driver, Seat_X_Disp, Seat_Z_Disp, Seat_Back_rotatio
                      + 0.1545*z*sinA - 3.8715*z*cosA)
             
             # 3) AnkleL_angle
-            ankleL = (3.5722 - 3.9128*x - 1.0510*z 
+            AnkleL = (3.5722 - 3.9128*x - 1.0510*z 
                       + 0.0780*sinA - 3.5596*cosA 
                       - 0.2896*x*sinA + 3.7978*x*cosA 
                       - 0.1528*z*sinA + 1.0101*z*cosA)
@@ -171,7 +348,7 @@ def calc_joint_angles(ot, is_driver, Seat_X_Disp, Seat_Z_Disp, Seat_Back_rotatio
                      + 0.0819*z*sinA - 3.5360*z*cosA)
             
             # 6) AnkleR_angle
-            ankleR = (0.0510 - 0.2372*x - 1.9154*z 
+            AnkleR = (0.0510 - 0.2372*x - 1.9154*z 
                       - 0.1014*sinA - 0.0182*cosA 
                       - 0.1907*x*sinA - 0.0876*x*cosA 
                       - 0.1604*z*sinA + 1.8528*z*cosA)
@@ -188,7 +365,7 @@ def calc_joint_angles(ot, is_driver, Seat_X_Disp, Seat_Z_Disp, Seat_Back_rotatio
                      - 1.9498*x*sinA + 5.8832*x*cosA 
                      + 0.6987*z*sinA - 11.1209*z*cosA)
             
-            return hipL, hipR, kneeL, kneeR, ankleL, ankleR, shoulder, elbow
+            return hipL, hipR, kneeL, kneeR, AnkleL, AnkleR, shoulder, elbow
             
         # --- 主驾95th假人 (OT=3) ---
         elif ot == 3:
@@ -339,7 +516,7 @@ def process_single_case(base_tree, case_data, case_id, is_driver, ot):
     if is_driver == 0:  # 副驾：3个角度 (hip, knee, ankle)
         val_hip, val_knee, val_ankle = joint_angles
     else:  # 主驾：8个角度
-        val_hipL, val_hipR, val_kneeL, val_kneeR, val_ankleL, val_ankleR, val_shoulder, val_elbow = joint_angles
+        val_hipL, val_hipR, val_kneeL, val_kneeR, val_AnkleL, val_AnkleR, val_shoulder, val_elbow = joint_angles
 
     # 定义其它的要修改的变量映射 {VAR_NAME: New_Value_String}
     if is_driver == 0:  # 副驾
@@ -363,13 +540,13 @@ def process_single_case(base_tree, case_data, case_id, is_driver, ot):
             "APTTF_def": f"{val_ptf_s:.6f}",    # 腰部预紧器点火
             "R_LL2TF": f"{val_ll2tf_s:.6f}",    # 二级限力切换
             "Dring_pos": val_dring_pos,         # D环位置
-            "PAB_TTF": f"{val_aft_s:.6f}",      # 气囊点火
+            "DAB_TTF": f"{val_aft_s:.6f}",      # 气囊点火,注意主驾是DAB!!!
             "hipL_angle": f"{val_hipL:.6f}",    # 八个关节角度
             "hipR_angle": f"{val_hipR:.6f}",
             "kneeL_angle": f"{val_kneeL:.6f}",
             "kneeR_angle": f"{val_kneeR:.6f}",
-            "AnkleL_angle": f"{val_ankleL:.6f}",
-            "AnkleR_angle": f"{val_ankleR:.6f}",
+            "AnkleL_angle": f"{val_AnkleL:.6f}",
+            "AnkleR_angle": f"{val_AnkleR:.6f}",
             "shoulder_angle": f"{val_shoulder:.6f}",
             "elbow_angle": f"{val_elbow:.6f}"
         }
