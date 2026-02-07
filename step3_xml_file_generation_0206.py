@@ -15,6 +15,7 @@ import pandas as pd
 from lxml import etree
 import os
 import copy
+from datetime import datetime
 
 # ==================== 1. 全局配置 ====================
 
@@ -32,6 +33,10 @@ PARAM_FILE_PATH = r'I:\000 LX\dataset0715\03\distribution_0206.csv'
 # =================================*****===================================
 PULSE_FILES_DIR = r'I:\000 LX\dataset0715\03\acc_data_before1111_6134'
 OUTPUT_DIR = os.path.join(BASE_XML_DIR, XML_TYPE)
+
+# Summary CSV (per-run, timestamped). Only "batch" mode implemented (one file per run).
+SUMMARY_CSV_FILENAME_TEMPLATE = 'xml_generation_summary_{ts}.csv'
+SUMMARY_CSV_MODE = 'batch'  # future: 'append' supported if needed
 
 # --- Base XML 文件映射 ---
 # =================================*****===================================
@@ -626,6 +631,14 @@ def generate_xml_files():
     # 设 case_id 为索引方便查找
     if 'case_id' in df.columns:
         df.set_index('case_id', inplace=True)
+
+    # ------------ summary-CSV 初始化 (严格列顺序，仅记录成功生成的 XML) ------------
+    # first: case_id; next guaranteed-from-distribution: impact_velocity, impact_angle, overlap
+    summary_distribution_cols = ['impact_velocity','impact_angle','overlap','LL1','LL2','BTF','LLATTF','PTF','AFT','SP','SH','RA','DZ','is_driver_side','OT']
+    summary_varname_cols = ['Seat_X_Disp','Seat_Z_Disp','Seat_Back_rotation_Angle','R_LL1F','R_LL2F','RPTTF_def','APTTF_def','R_LL2TF','Dring_pos','DAB_TTF','PAB_TTF','hip_angle','knee_angle','ankle_angle','hipL_angle','hipR_angle','kneeL_angle','kneeR_angle','AnkleL_angle','AnkleR_angle','shoulder_angle','elbow_angle']
+    summary_columns = ['case_id'] + summary_distribution_cols + summary_varname_cols
+    summary_rows = []
+    # -------------------------------------------------------------------------------
     
     # 3. 筛选要处理的 Case
     # 条件：
@@ -710,12 +723,51 @@ def generate_xml_files():
                 # 写入文件
                 # encoding='UTF-8', xml_declaration=True
                 new_tree.write(out_path, encoding='UTF-8', xml_declaration=True, pretty_print=True)
-                
+
+                # --- 记录 summary 行（仅在成功写入后） ---
+                try:
+                    parsed_out = etree.parse(out_path)
+
+                    def _get_define(name):
+                        nodes = parsed_out.xpath(f".//DEFINE[@VAR_NAME='{name}']")
+                        if not nodes:
+                            return ''
+                        return nodes[0].attrib.get('VALUE', '')
+
+                    row = {'case_id': case_id}
+                    # distribution-sourced columns (preserve names)
+                    src = df.loc[case_id]
+                    for c in summary_distribution_cols:
+                        # prefer exact column, fallback to empty string
+                        row[c] = (src[c] if c in src.index else '')
+
+                    # VAR_NAME columns read from the written XML (string values)
+                    for vn in summary_varname_cols:
+                        row[vn] = _get_define(vn)
+
+                    summary_rows.append(row)
+                except Exception as _err:
+                    # do NOT fail the whole run for summary collection; warn and continue
+                    print(f"  [Warning] Case {case_id}: 无法记录 summary 行: {_err}")
+
                 success_count += 1
                 if success_count % 50 == 0:
                     print(f"已生成 {success_count} 个文件...")
         except Exception as e:
             print(f"Case {case_id} 处理发生未知异常: {e}")
+
+    # 在结束前批量写入 summary CSV（原子替换 tmp -> final）
+    if summary_rows:
+        ts = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+        summary_name = SUMMARY_CSV_FILENAME_TEMPLATE.format(ts=ts)
+        summary_path = os.path.join(OUTPUT_DIR, summary_name)
+        tmp_path = summary_path + '.tmp'
+        try:
+            pd.DataFrame(summary_rows, columns=summary_columns).to_csv(tmp_path, index=False)
+            os.replace(tmp_path, summary_path)
+            print(f"Summary CSV 写入: {summary_path}")
+        except Exception as _err:
+            print(f"[Warning] 无法写入 summary CSV: {_err}")
 
     print("="*60)
     print(f"处理完成！")

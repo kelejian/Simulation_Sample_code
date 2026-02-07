@@ -62,16 +62,16 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
         data = {col: data_df[col].values for col in data_df.columns}
         print(f"*排除is_pulse_ok为False后，剩余样本数: {filtered_count} (初始样本数: {initial_count})")
         print("-" * 60)
-    # 限定主驾侧5th假人（OT=1）的样本进行验证和可视化
+    # 限定主驾侧50th假人（OT=2）的样本进行验证和可视化
     if 'OT' in data and 'is_driver_side' in data:
         print("-" * 60)
-        print("*限定主驾侧5th假人（OT=1）的样本进行验证和可视化")
+        print("*限定主驾侧50th假人（OT=2）的样本进行验证和可视化")
         data_df = pd.DataFrame(data)
         initial_count = len(data_df)
-        data_df = data_df[(data_df['OT'] == 1) & (data_df['is_driver_side'] == 1)]
+        data_df = data_df[(data_df['OT'] == 2) & (data_df['is_driver_side'] == 1)]
         filtered_count = len(data_df)
         data = {col: data_df[col].values for col in data_df.columns}
-        print(f"*限定主驾侧5th假人后，剩余样本数: {filtered_count} (初始样本数: {initial_count})")
+        print(f"*限定主驾侧50th假人后，剩余样本数: {filtered_count} (初始样本数: {initial_count})")
         print("-" * 60)
     # ******************************************************************************
     
@@ -864,9 +864,9 @@ if __name__ == '__main__':
     
     # MADYMO验证
     verify_and_visualize_params(
-        r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0206.csv',
+        r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0206.csv',
         flag='MADYMO',
-        output_dir='MADYMO_sample_verification_0206',
+        output_dir='MADYMO_sample_verification_0206_OT2',
         param_pairs=[
             ('LL1', 'LL2'),
             ('BTF', 'LLATTF'),
