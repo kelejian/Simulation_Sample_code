@@ -62,16 +62,16 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
         data = {col: data_df[col].values for col in data_df.columns}
         print(f"*排除is_pulse_ok为False后，剩余样本数: {filtered_count} (初始样本数: {initial_count})")
         print("-" * 60)
-    # 限定主驾侧50th假人（OT=2）的样本进行验证和可视化
+    # 限定主驾侧xx th假人样本进行验证和可视化
     if 'OT' in data and 'is_driver_side' in data:
         print("-" * 60)
-        print("*限定主驾侧50th假人（OT=2）的样本进行验证和可视化")
+        print("*限定主驾侧95th假人（OT=3）的样本进行验证和可视化")
         data_df = pd.DataFrame(data)
         initial_count = len(data_df)
-        data_df = data_df[(data_df['OT'] == 2) & (data_df['is_driver_side'] == 1)]
+        data_df = data_df[(data_df['OT'] == 3) & (data_df['is_driver_side'] == 1)]
         filtered_count = len(data_df)
         data = {col: data_df[col].values for col in data_df.columns}
-        print(f"*限定主驾侧50th假人后，剩余样本数: {filtered_count} (初始样本数: {initial_count})")
+        print(f"*限定主驾侧95th假人后，剩余样本数: {filtered_count} (初始样本数: {initial_count})")
         print("-" * 60)
     # ******************************************************************************
     
@@ -378,7 +378,7 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
                 side_valid = side_data[valid_mask]
                 
                 # SP范围定义
-                # 主驾 (is_driver_side=1): 5th: [+40, +110], 50th: [-40, +60], 95th: [-110, +20]
+                # 主驾 (is_driver_side=1): 5th: [+40, +110], 50th: [-40, +60], 95th: [-60, +30]
                 # 副驾 (is_driver_side=0): 5th/50th: [-110, +110], 95th: [-110, +49]
                 is_sp_valid = True
                 
@@ -395,7 +395,7 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
                 # 主驾 95th
                 mask_driver_95th = (side_valid == 1) & (ot_valid == 3)
                 if np.any(mask_driver_95th):
-                    is_sp_valid &= np.all((sp_valid[mask_driver_95th] >= -110) & (sp_valid[mask_driver_95th] <= 20))
+                    is_sp_valid &= np.all((sp_valid[mask_driver_95th] >= -60) & (sp_valid[mask_driver_95th] <= 30))
                 
                 # 副驾 5th/50th
                 mask_pass_5th_50th = (side_valid == 0) & ((ot_valid == 1) | (ot_valid == 2))
@@ -414,13 +414,15 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
                 # -------------------- 额外严格校验：(SP, SH) 必须位于采样端定义的多边形内（逐组） --------------------
                 try:
                     # 与采样端一致的多边形顶点（单位：mm）
+                    # SEAT_POLYS 的定义也在后面的代码中出现, 注意保持一致!!
                     SEAT_POLYS = {
-                        (1, 1): [(40, 0), (110, 5.5), (110, 60), (80, 60), (80, 30), (40, 30)],
-                        (1, 2): [(-40, -2.2), (60, 3.3), (60, 60), (-40, 60)],
-                        (1, 3): [(-110, -10), (20, -10), (20, 70), (-110, 70)],
-                        (0, 1): [(-110, -10), (110, -10), (110, 70), (-110, 70)],
-                        (0, 2): [(-110, -10), (110, -10), (110, 70), (-110, 70)],
-                        (0, 3): [(-110, -10), (49, -10), (49, 70), (-110, 70)],
+                        # (is_driver_side [1=Main, 0=Pass], OT [1=5th, 2=50th, 3=95th])
+                        (1, 1): [(40, 0), (110, 110/20), (110, 60), (80, 60), (80, 30), (40, 30)], # 主驾 5th; 0205调整
+                        (1, 2): [(-40, -40/18), (60, 60/18), (60, 60), (-40, 60)], # 主驾 50th ; 0122调整
+                        (1, 3): [(-60, -60/18), (30, 30/18), (30, 60), (-60, 60)],    # 主驾 95th ; 0224调整
+                        (0, 1): [(-110, -10), (110, -10), (110, 70), (-110, 70)],  # 副驾 5th
+                        (0, 2): [(-110, -10), (110, -10), (110, 70), (-110, 70)],  # 副驾 50th
+                        (0, 3): [(-110, -10), (49, -10), (49, 70), (-110, 70)],    # 副驾 95th
                     }
 
                     sp_sh_mask = ~(np.isnan(data.get('SP', np.array([np.nan]*len(data[first_param]))).astype(float)) |
@@ -476,10 +478,10 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
                 SH_RANGES = {
                     (1, 1): (0.0, 60.0),    # 主驾 5th
                     (1, 2): (-3.0, 60.0),   # 主驾 50th
-                    (1, 3): (-10.0, 70.0),  # 主驾 95th
-                    (0, 1): (-10.0, 70.0),  # 副驾 5th
-                    (0, 2): (-10.0, 70.0),  # 副驾 50th
-                    (0, 3): (-10.0, 70.0),  # 副驾 95th
+                    (1, 3): (-4.0, 60.0),  # 主驾 95th
+                    (0, 1): (-7.0, 60.0),  # 副驾 5th
+                    (0, 2): (-7.0, 60.0),  # 副驾 50th
+                    (0, 3): (-7.0, 60.0),  # 副驾 95th
                 }
 
                 is_sh_valid = True
@@ -748,12 +750,13 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
                 if flag == 'MADYMO' and ((param1 == 'SP' and param2 == 'SH') or (param1 == 'SH' and param2 == 'SP')):
                     try:
                         SEAT_POLYS = {
-                            (1, 1): [(40, 0), (110, 5.5), (110, 60), (80, 60), (80, 30), (40, 30)],
-                            (1, 2): [(-40, -2.2), (60, 3.3), (60, 60), (-40, 60)],
-                            (1, 3): [(-110, -10), (20, -10), (20, 70), (-110, 70)],
-                            (0, 1): [(-110, -10), (110, -10), (110, 70), (-110, 70)],
-                            (0, 2): [(-110, -10), (110, -10), (110, 70), (-110, 70)],
-                            (0, 3): [(-110, -10), (49, -10), (49, 70), (-110, 70)],
+                            # (is_driver_side [1=Main, 0=Pass], OT [1=5th, 2=50th, 3=95th])
+                            (1, 1): [(40, 0), (110, 110/20), (110, 60), (80, 60), (80, 30), (40, 30)], # 主驾 5th; 0205调整
+                            (1, 2): [(-40, -40/18), (60, 60/18), (60, 60), (-40, 60)], # 主驾 50th ; 0122调整
+                            (1, 3): [(-60, -60/18), (30, 30/18), (30, 60), (-60, 60)],    # 主驾 95th ; 0224调整
+                            (0, 1): [(-110, -10), (110, -10), (110, 70), (-110, 70)],  # 副驾 5th
+                            (0, 2): [(-110, -10), (110, -10), (110, 70), (-110, 70)],  # 副驾 50th
+                            (0, 3): [(-110, -10), (49, -10), (49, 70), (-110, 70)],    # 副驾 95th
                         }
 
                         # 获取当前绘图中实际存在的 (side, OT) 组合 —— 仅绘制这些多边形
@@ -864,9 +867,9 @@ if __name__ == '__main__':
     
     # MADYMO验证
     verify_and_visualize_params(
-        r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0206.csv',
+        r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0223.csv',
         flag='MADYMO',
-        output_dir='MADYMO_sample_verification_0206_OT2',
+        output_dir='MADYMO_sample_verification_0223_OT3',
         param_pairs=[
             ('LL1', 'LL2'),
             ('BTF', 'LLATTF'),

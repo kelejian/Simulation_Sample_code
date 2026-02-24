@@ -487,10 +487,10 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
     # LL1非均匀采样器（20260205额外加权调整）
     ll1_histogram_data = [
         [1.0, 1.5, 30.0], 
-        [1.5, 2.0, 75.0], # OT=2为75.0; OT=1为84.0
-        [2.0, 2.5, 45.0],
-        [2.5, 3.0, 45.0], 
-        [3.0, 4.5, 5.0],
+        [1.5, 2.0, 75.0], # OT=2/3为75.0; OT=1为84.0
+        [2.0, 2.5, 55.0],
+        [2.5, 3.0, 50.0], 
+        [3.0, 4.5, 7.0],
         [4.5, 7.0, 2.5],
     ]
     ll1_sampler = create_piecewise_sampler(ll1_histogram_data)
@@ -498,9 +498,9 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
     # LL2非均匀采样器（20260205额外加权调整）
     ll2_histogram_data = [
         [0.5, 1.5, 60.0], 
-        [1.5, 2.7, 25.0], 
-        [2.7, 3.0, 5.0], 
-        [3.0, 4.5, 3.0],
+        [1.5, 2.7, 30.0], 
+        [2.7, 3.0, 5.5], 
+        [3.0, 4.5, 3.5],
     ]
     ll2_sampler = create_piecewise_sampler(ll2_histogram_data)
     
@@ -526,7 +526,7 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
         # (is_driver_side [1=Main, 0=Pass], OT [1=5th, 2=50th, 3=95th])
         (1, 1): [(40, 0), (110, 110/20), (110, 60), (80, 60), (80, 30), (40, 30)], # 主驾 5th; 0205调整
         (1, 2): [(-40, -40/18), (60, 60/18), (60, 60), (-40, 60)], # 主驾 50th ; 0122调整
-        (1, 3): [(-110, -10), (20, -10), (20, 70), (-110, 70)],    # 主驾 95th
+        (1, 3): [(-60, -60/18), (30, 30/18), (30, 60), (-60, 60)],    # 主驾 95th ; 0224调整
         (0, 1): [(-110, -10), (110, -10), (110, 70), (-110, 70)],  # 副驾 5th
         (0, 2): [(-110, -10), (110, -10), (110, 70), (-110, 70)],  # 副驾 50th
         (0, 3): [(-110, -10), (49, -10), (49, 70), (-110, 70)],    # 副驾 95th
@@ -677,7 +677,7 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
         poly_points = SEAT_CONSTRAINTS.get((int(is_driver_side), ot_val))
         if poly_points is None:
             # 默认全范围兜底
-            poly_points = [(-110, -10), (110, -10), (110, 70), (-110, 70)] 
+            poly_points = [(-110, -10), (110, -10), (110, 60), (-110, 60)] 
             
         # 计算包围盒 (Bounding Box)
         poly_points = np.array(poly_points)
@@ -752,8 +752,8 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
 
 # ==================== 主程序入口 ====================
 if __name__ == '__main__':
-    distribution_file = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0205.csv'
-    new_filename = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0206.csv'
+    distribution_file = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0206.csv'
+    new_filename = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0223.csv'
     
 
     # *************************************************************
@@ -761,7 +761,7 @@ if __name__ == '__main__':
     # 条件：is_pulse_ok为True 且 OT 满足特定条件
     driver_side_only = 1  # 设置为1表示只采样主驾侧，0表示只采样副驾侧，None表示采样所有
     sample_ot_flag = False  # True: 重新采样OT; False: 保持原有OT值
-    ot_to_sample = 2 # 1为5th假人，2为50th假人，3为95th假人；仅当 sample_ot_flag=False 时有效，用于筛选 case_id 列表
+    ot_to_sample = 3 # 1为5th假人，2为50th假人，3为95th假人；仅当 sample_ot_flag=False 时有效，用于筛选 case_id 列表
     # *************************************************************
 
     if distribution_file.endswith('.csv'):
@@ -792,17 +792,17 @@ if __name__ == '__main__':
     print(f"需要填充约束系统参数的case_id数量: {len(case_ids_to_fill)}")
     
     if len(case_ids_to_fill) > 0:
-        # 可选：指定只采样哪些参数（None=全部(但不包括OT)，[]=no-op，['BTF','LL1']=只采这两项）
+
         # 注意：OT 的采样仅由 sample_ot_flag 控制，不通过 sample_params 指定 OT
-        # sample_params = None  # e.g. ['BTF'] 或 [] 表示 no-op（保持字节一致）
-        sample_params = ['LL1', 'LL2']  # 仅采样这些参数，OT由 sample_ot_flag 控制, 其它参数保持输入文件中的值
+        # sample_params = None  # 
+        sample_params = None  # 仅采样这些参数，OT由 sample_ot_flag 控制, 其它参数保持输入文件中的值 ; e.g. None(全部), ['LL1,LL2'](仅采这两样) 或 [] 表示 no-op（保持字节一致）
 
         sample_restraint_params(
             filename=distribution_file,
             new_filename=new_filename,
             case_ids=case_ids_to_fill,
-            skip_points=20000,
-            seed=20260206,
+            skip_points=25000,
+            seed=20260223,
             sample_ot=sample_ot_flag,
             sample_params=sample_params
         )
