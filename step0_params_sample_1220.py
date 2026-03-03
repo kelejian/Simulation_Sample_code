@@ -203,11 +203,15 @@ def sample_collision_params(n_samples=6000, skip_points=1024, method='uniform',
     # 添加额外的列
     if case_ids is None:
         case_ids = np.arange(1, n_samples + 1)
+    case_ids = np.asarray(case_ids, dtype=np.int64)
+    if case_ids.shape[0] != n_samples:
+        raise ValueError(f"case_ids 长度({case_ids.shape[0]})与 n_samples({n_samples})不一致")
     
     df.insert(0, 'case_id', case_ids)
-    df.insert(1, 'have_run', False) # 后面再填充True/False
-    df.insert(2, 'is_pulse_ok', np.full(n_samples, np.nan)) # 后面再填充True/False
-    df.insert(3, 'is_injury_ok', np.full(n_samples, np.nan)) # 后面再填充True/False
+    df.insert(1, 'pulse_source_case_id', case_ids.copy())
+    df.insert(2, 'have_run', False) # 后面再填充True/False
+    df.insert(3, 'is_pulse_ok', np.full(n_samples, np.nan)) # 后面再填充True/False
+    df.insert(4, 'is_injury_ok', np.full(n_samples, np.nan)) # 后面再填充True/False
     
     # 保存结果
     if filename.endswith('npz'):
@@ -411,7 +415,7 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
 
     # ------------- validate `sample_params` (minimal, strict) --------------
     # NOTE: OT 由独立参数 `sample_ot` 控制 — 不允许通过 sample_params 指定 OT
-    VALID_SAMPLE_NAMES = {"LL1","LL2","BTF","LLATTF","AFT","SP","SH","RA"}
+    VALID_SAMPLE_NAMES = {"LL1","LL2","BTF","LLATTF","AFT","SP","SH","RA"} # 仅允许这些参数被 sample_params 控制采样；其他参数（如 OT）只能通过专门的参数控制, 并且派生列（如 PTF、DZ）不允许直接采样
     DERIVED_NAMES = {"PTF","DZ"}
     if sample_params is not None and not isinstance(sample_params, (list, tuple, set)):
         raise TypeError("sample_params must be None or an iterable of column names (list/tuple/set)")
@@ -440,8 +444,9 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
     if n_samples is None:
         n_samples = len(case_ids)
 
-    # 准备一个集合以便快速检查成员资格（None 保持旧行为）
-    sample_set = None if sample_params is None else set(sample_params)
+    # 准备一个集合以便快速检查成员资格。
+    # 如果没有指定 sample_params（即为 None），我们将默认采样所有可控制的参数，因此将集合初始化为 VALID_SAMPLE_NAMES。
+    sample_set = set(VALID_SAMPLE_NAMES) if sample_params is None else set(sample_params)
 
     print(f"  - 将对 {n_samples} 个case_id进行约束系统参数填充")
     print(f"  - 跳过初始点: {skip_points}")
@@ -456,8 +461,29 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
     else:
         raise ValueError("Unsupported file format. Use '.npz' or '.csv'.")
     
+    # 严格新逻辑：必须提供 pulse_source_case_id（不再使用 case_id 偏移推断波形来源）
+    required_base_cols = ['case_id', 'pulse_source_case_id', 'impact_velocity', 'overlap', 'is_driver_side', 'OT']
+    missing_cols = [c for c in required_base_cols if c not in existing_data.columns]
+    if missing_cols:
+        raise ValueError(f"输入文件缺少必要列: {missing_cols}")
+
+    # 关键列类型规范化
+    existing_data['case_id'] = pd.to_numeric(existing_data['case_id'], errors='raise').astype(np.int64)
+    existing_data['pulse_source_case_id'] = pd.to_numeric(existing_data['pulse_source_case_id'], errors='raise').astype(np.int64)
+    existing_data['is_driver_side'] = pd.to_numeric(existing_data['is_driver_side'], errors='raise').astype(np.int64)
+    existing_data['OT'] = pd.to_numeric(existing_data['OT'], errors='coerce')
+
     # 设置case_id为索引以便快速查找
     existing_data.set_index('case_id', drop=False, inplace=True)
+
+    # case_ids 入参严格检查
+    case_ids = np.asarray(case_ids, dtype=np.int64)
+    if case_ids.shape[0] != n_samples:
+        raise ValueError(f"case_ids 长度({case_ids.shape[0]})与 n_samples({n_samples})不一致")
+
+    missing_case_ids = np.setdiff1d(case_ids, existing_data.index.values.astype(np.int64))
+    if missing_case_ids.size > 0:
+        raise ValueError(f"以下 case_id 在输入文件中不存在: {missing_case_ids[:20].tolist()} (共{missing_case_ids.size}个)")
     
     # ==================== 定义参数采样维度 ====================
     param_dims = {
@@ -484,24 +510,26 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
     # 拒绝采样用的独立随机数生成器
     rejection_rng = np.random.Generator(np.random.PCG64(seed + 666))
     
-    # LL1非均匀采样器（20260205额外加权调整）
+    # *********************************************************
+    # LL1非均匀采样器
     ll1_histogram_data = [
-        [1.0, 1.5, 30.0], 
-        [1.5, 2.0, 75.0], # OT=2/3为75.0; OT=1为84.0
-        [2.0, 2.5, 55.0],
-        [2.5, 3.0, 50.0], 
-        [3.0, 4.5, 7.0],
-        [4.5, 7.0, 2.5],
+        [1.0, 1.5, 35.0], 
+        [1.5, 2.0, 65.0],
+        [2.0, 2.5, 60.0],
+        [2.5, 3.0, 45.0], 
+        [3.0, 4.5, 0.0],
+        [4.5, 7.0, 0.0],
     ]
     ll1_sampler = create_piecewise_sampler(ll1_histogram_data)
     
-    # LL2非均匀采样器（20260205额外加权调整）
+    # LL2非均匀采样器
     ll2_histogram_data = [
-        [0.5, 1.5, 60.0], 
-        [1.5, 2.7, 30.0], 
-        [2.7, 3.0, 5.5], 
-        [3.0, 4.5, 3.5],
+        [0.5, 1.5, 100.0], 
+        [1.5, 2.7, 0.0], 
+        [2.7, 3.0, 0], 
+        [3.0, 4.5, 0],
     ]
+    # *********************************************************
     ll2_sampler = create_piecewise_sampler(ll2_histogram_data)
     
     # OT非均匀采样器：OT=1(30%), OT=2(40%), OT=3(30%)
@@ -527,9 +555,9 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
         (1, 1): [(40, 0), (110, 110/20), (110, 60), (80, 60), (80, 30), (40, 30)], # 主驾 5th; 0205调整
         (1, 2): [(-40, -40/18), (60, 60/18), (60, 60), (-40, 60)], # 主驾 50th ; 0122调整
         (1, 3): [(-60, -60/18), (30, 30/18), (30, 60), (-60, 60)],    # 主驾 95th ; 0224调整
-        (0, 1): [(-110, -10), (110, -10), (110, 70), (-110, 70)],  # 副驾 5th
-        (0, 2): [(-110, -10), (110, -10), (110, 70), (-110, 70)],  # 副驾 50th
-        (0, 3): [(-110, -10), (49, -10), (49, 70), (-110, 70)],    # 副驾 95th
+        (0, 1): [(-110, 0), (110, 0), (110, 0), (-110, 0)],  # 副驾 5th
+        (0, 2): [(-110, 0), (110, 0), (110, 0), (-110, 0)],  # 副驾 50th
+        (0, 3): [(-110, 0), (49, 0), (49, 0), (-110, 0)],    # 副驾 95th
     }
     
     # RA离散值：主驾 [15, 20, 25, 30]°，副驾 [20, 25, 30, 35, 40]°
@@ -587,7 +615,7 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
         results['DZ'].append(dz_val)
         
         # -------------------- 安全带一级/二级限力 LL1 & LL2 (非均匀采样，需满足 LL2 < LL1) --------------------
-        if sample_set is None or ('LL1' in sample_set and 'LL2' in sample_set):
+        if 'LL1' in sample_set and 'LL2' in sample_set:
             # 原有行为：同时采样并用拒绝采样确保 LL1 > LL2
             ll1_val = ll1_sampler(sample[param_dims['LL1']])
             ll2_val = ll2_sampler(sample[param_dims['LL2']])
@@ -618,7 +646,7 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
         results['LL2'].append(float(ll2_val) if not pd.isna(ll2_val) else np.nan) 
         
         # -------------------- 预紧器点火时刻 BTF --------------------
-        if sample_set is None or ('BTF' in sample_set):
+        if 'BTF' in sample_set:
             if np.isnan(velocity) or np.isnan(overlap_rate):
                 # 碰撞工况参数缺失时使用Sobol采样
                 btf_val = sample[param_dims['BTF']] * (100 - 10) + 10
@@ -638,7 +666,7 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
         # LLATTF = BTF + offset，其中 offset ∈ [0, 100] ms
         # 如果 LLATTF >= 150，则设为 150（代表不切换二级限力）
         # 额外规则：以5%概率直接设为150ms，确保不切换二级限力的样本占比大约5%~6%
-        if sample_set is None or ('LLATTF' in sample_set):
+        if 'LLATTF' in sample_set:
             llattf_150ms_prob = 0.05
             if rejection_rng.random() < llattf_150ms_prob:
                 # 直接设为150ms（不切换二级限力）
@@ -652,14 +680,15 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
         else:
             # 不采样 LLATTF：保留现有值，但若 BTF 被采样需验证一致性（严格模式）
             llattf_val = existing_data.at[case_id, 'LLATTF']
-            if ('BTF' in (sample_set or set())) and not pd.isna(llattf_val) and llattf_val < btf_val:
+            # 如果采样了 BTF，但现有 LLATTF 不满足 LLATTF >= BTF 的约束，则报错提示用户同时采样 LLATTF 或修正输入文件
+            if 'BTF' in sample_set and not pd.isna(llattf_val) and llattf_val < btf_val:
                 raise ValueError(f"case_id={case_id}: 未采样 LLATTF 但采样了 BTF，现有 LLATTF({llattf_val}) < 新 BTF({btf_val})，请同时采样或修正输入文件。")
         results['LLATTF'].append(float(llattf_val) if not pd.isna(llattf_val) else np.nan)
         
         # -------------------- 气囊点火时刻 AFT --------------------
         # 约束: AFT < BTF + 25
         # -------------------- 气囊点火时刻 AFT --------------------
-        if sample_set is None or ('AFT' in sample_set):
+        if 'AFT' in sample_set:
             aft_val = sample[param_dims['AFT']] * (100 - 10) + 10  # [10, 100] ms
             max_aft = btf_val + 25 - 0.001  # 留一点余量
             # 拒绝采样确保 AFT < BTF + 25
@@ -668,7 +697,8 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
         else:
             # 不采样 AFT：严格模式 -> 若 BTF 被采样且现有 AFT 不满足约束则报错
             aft_val = existing_data.at[case_id, 'AFT']
-            if ('BTF' in (sample_set or set())) and not pd.isna(aft_val) and aft_val >= (btf_val + 25):
+            # 如果采样了 BTF，但现有 AFT 不满足 AFT < BTF + 25 的约束，则报错提示用户同时采样 AFT 或修正输入文件
+            if 'BTF' in sample_set and not pd.isna(aft_val) and aft_val >= (btf_val + 25):
                 raise ValueError(f"case_id={case_id}: 未采样 AFT 但采样了 BTF，现有 AFT({aft_val}) >= 新 BTF+25({btf_val + 25}) — 请同时采样 AFT 或修正输入文件。")
         results['AFT'].append(float(aft_val) if not pd.isna(aft_val) else np.nan)
         
@@ -686,12 +716,28 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
         
         # 将Sobol样本映射到包围盒 — 支持部分采样
         poly_path = Path(poly_points)
-        if sample_set is None or ('SP' in sample_set and 'SH' in sample_set):
-            sp_val = sample[param_dims['SP']] * (sp_max - sp_min) + sp_min
-            sh_val = sample[param_dims['SH']] * (sh_max - sh_min) + sh_min
-            while not poly_path.contains_point((sp_val, sh_val)):
-                sp_val = rejection_rng.uniform(sp_min, sp_max)
-                sh_val = rejection_rng.uniform(sh_min, sh_max)
+        if 'SP' in sample_set and 'SH' in sample_set:
+            # special-case degenerate bounding boxes so we don't loop forever
+            if sp_min == sp_max and sh_min == sh_max:
+                # completely fixed point
+                sp_val = sp_min
+                sh_val = sh_min
+            elif sh_min == sh_max:
+                # height fixed, width may vary
+                sp_val = sample[param_dims['SP']] * (sp_max - sp_min) + sp_min
+                sh_val = sh_min
+                # horizontal line; any sp_val within [sp_min,sp_max] is valid
+            elif sp_min == sp_max:
+                # position fixed, height may vary
+                sp_val = sp_min
+                sh_val = sample[param_dims['SH']] * (sh_max - sh_min) + sh_min
+                # vertical line
+            else:
+                sp_val = sample[param_dims['SP']] * (sp_max - sp_min) + sp_min
+                sh_val = sample[param_dims['SH']] * (sh_max - sh_min) + sh_min
+                while not poly_path.contains_point((sp_val, sh_val)):
+                    sp_val = rejection_rng.uniform(sp_min, sp_max)
+                    sh_val = rejection_rng.uniform(sh_min, sh_max)
         elif 'SP' in sample_set and 'SH' not in sample_set:
             sp_val = sample[param_dims['SP']] * (sp_max - sp_min) + sp_min
             sh_val = existing_data.at[case_id, 'SH']
@@ -711,7 +757,7 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
         
         # -------------------- 座椅靠背角度 RA (离散化采样，区分主副驾和不同假人体型) --------------------
         ra_options = RA_VALUES.get((int(is_driver_side), ot_val)) # 根据主副驾和假人体型获取对应的RA选项列表
-        if sample_set is None or ('RA' in sample_set):
+        if 'RA' in sample_set:
             # 将[0,1)均匀样本映射到离散档位
             ra_idx = int(np.floor(sample[param_dims['RA']] * len(ra_options)))
             ra_idx = max(min(ra_idx, len(ra_options) - 1), 0)  # 确保索引不越界,在0到len-1之间
@@ -752,33 +798,43 @@ def sample_restraint_params(filename, new_filename, case_ids, n_samples=None, sk
 
 # ==================== 主程序入口 ====================
 if __name__ == '__main__':
-    distribution_file = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0206.csv'
-    new_filename = r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0223.csv'
+    distribution_file = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0301.csv'
+    new_filename = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0302.csv'
     
-
-    # *************************************************************
-    # 读取需要填充的case_id列表，可选只采样主驾侧的或副驾侧的
-    # 条件：is_pulse_ok为True 且 OT 满足特定条件
-    driver_side_only = 1  # 设置为1表示只采样主驾侧，0表示只采样副驾侧，None表示采样所有
-    sample_ot_flag = False  # True: 重新采样OT; False: 保持原有OT值
-    ot_to_sample = 3 # 1为5th假人，2为50th假人，3为95th假人；仅当 sample_ot_flag=False 时有效，用于筛选 case_id 列表
-    # *************************************************************
-
     if distribution_file.endswith('.csv'):
         df = pd.read_csv(distribution_file)
-        if driver_side_only is not None:
-            df = df[df['is_driver_side'] == driver_side_only]
-        # 只采样 is_pulse_ok 为 True 且 OT 为某个值的case_id
-        case_ids_to_fill = df[(df['is_pulse_ok'] == True) & (df['OT']==ot_to_sample)]['case_id'].tolist()
     elif distribution_file.endswith('.npz'):
         with np.load(distribution_file) as data:
             df = pd.DataFrame({key: data[key] for key in data.files})
-            if driver_side_only is not None:
-                df = df[df['is_driver_side'] == driver_side_only]
-            # 只采样 is_pulse_ok 为 True 且 OT 为某个值的case_id
-            case_ids_to_fill = df[(df['is_pulse_ok'] == True) & (df['OT']==ot_to_sample)]['case_id'].tolist()
     else:
         raise ValueError("Unsupported file format.")
+
+
+    # *************************************************************
+    # 采样控制参数设置（TO ADJUST）
+    driver_side_only = 0  # 设置为1表示只采样主驾侧，0表示只采样副驾侧，None表示采样所有
+    sample_ot_flag = True  # True: 重新采样OT; False: 保持原有OT值
+    ot_to_sample = 3 # 仅当 sample_ot_flag=False 时有效:  1为5th假人，2为50th假人，3为95th假人；
+    sample_params = None  # 需采样的参数名list (注: OT由 sample_ot_flag 控制), 其它参数保持输入文件中的值 ; e.g. None(全部但不控制ot采样), ['LL1,LL2'](仅采这两样) 或 [] 表示 no-op（保持字节一致）
+    # *************************************************************
+    # 应用筛选条件获取需要填充的 case_id 列表
+    if driver_side_only is not None:
+        # 只采样 is_pulse_ok 为 True 且 OT 为某个值的case_id
+        if sample_ot_flag:
+            # 采样 OT 的情况下不对 OT 进行筛选
+            print("采样 OT !!!")
+            df_filtered = df[(df['is_driver_side'] == driver_side_only) 
+                            & (df['is_pulse_ok'] == True)
+                            & (df['case_id'] > 70000)]
+        else:
+            # 不采样 OT 的情况下需要对 OT 进行筛选
+            df_filtered = df[(df['is_driver_side'] == driver_side_only) 
+                            & (df['is_pulse_ok'] == True) 
+                            & (df['OT']==ot_to_sample)]
+            
+        case_ids_to_fill = df_filtered['case_id'].tolist()
+    # *************************************************************
+
     if driver_side_only == 1:
         print("仅对主驾侧进行约束系统参数采样。")
     elif driver_side_only == 0:
@@ -793,16 +849,12 @@ if __name__ == '__main__':
     
     if len(case_ids_to_fill) > 0:
 
-        # 注意：OT 的采样仅由 sample_ot_flag 控制，不通过 sample_params 指定 OT
-        # sample_params = None  # 
-        sample_params = None  # 仅采样这些参数，OT由 sample_ot_flag 控制, 其它参数保持输入文件中的值 ; e.g. None(全部), ['LL1,LL2'](仅采这两样) 或 [] 表示 no-op（保持字节一致）
-
         sample_restraint_params(
             filename=distribution_file,
             new_filename=new_filename,
             case_ids=case_ids_to_fill,
-            skip_points=25000,
-            seed=20260223,
+            skip_points=30000,
+            seed=20260301,
             sample_ot=sample_ot_flag,
             sample_params=sample_params
         )

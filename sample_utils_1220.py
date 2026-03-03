@@ -49,29 +49,38 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
         return None
     
     print(f"数据包含 {len(data)} 个参数，{len(list(data.values())[0])} 个样本")
+
+    # 严格新逻辑：必须包含 pulse_source_case_id
+    required_cols = ['case_id', 'pulse_source_case_id']
+    missing_required = [c for c in required_cols if c not in data]
+    if missing_required:
+        raise ValueError(f"输入数据缺少必要列: {missing_required}")
     
     # ******************************************************************************
+    # MADYMO验证的额外过滤逻辑
     # 排除is_pulse_ok为False的case_id, 不包含is_pulse_ok为NaN的样本
     if 'case_id' in data and 'is_pulse_ok' in data:
         print("-" * 60)
-        print("*排除is_pulse_ok为False的case_id, 但不排除is_pulse_ok为NaN的样本")
+        print("*排除is_pulse_ok不为True的case_id")
         data_df = pd.DataFrame(data)
         initial_count = len(data_df)
-        data_df = data_df[~(data_df['is_pulse_ok'] == False)]
+        data_df = data_df[data_df['is_pulse_ok'] == True]
         filtered_count = len(data_df)
         data = {col: data_df[col].values for col in data_df.columns}
-        print(f"*排除is_pulse_ok为False后，剩余样本数: {filtered_count} (初始样本数: {initial_count})")
+        print(f"*排除is_pulse_ok不为True后，剩余样本数: {filtered_count} (初始样本数: {initial_count})")
         print("-" * 60)
-    # 限定主驾侧xx th假人样本进行验证和可视化
+    # 限定主/副驾侧xx th假人样本进行验证和可视化
     if 'OT' in data and 'is_driver_side' in data:
         print("-" * 60)
-        print("*限定主驾侧95th假人（OT=3）的样本进行验证和可视化")
+        # print("*限定主驾侧95th假人（OT=3）的样本进行验证和可视化")
         data_df = pd.DataFrame(data)
         initial_count = len(data_df)
-        data_df = data_df[(data_df['OT'] == 3) & (data_df['is_driver_side'] == 1)]
+        # data_df = data_df[(data_df['OT'] == 3) & (data_df['is_driver_side'] == 1)]
+        data_df = data_df[(data_df['is_driver_side'] == 0)]
         filtered_count = len(data_df)
         data = {col: data_df[col].values for col in data_df.columns}
-        print(f"*限定主驾侧95th假人后，剩余样本数: {filtered_count} (初始样本数: {initial_count})")
+        # print(f"*限定主驾侧95th假人后，剩余样本数: {filtered_count} (初始样本数: {initial_count})")
+        print(f"*限定副驾侧样本后，剩余样本数: {filtered_count} (初始样本数: {initial_count})")
         print("-" * 60)
     # ******************************************************************************
     
@@ -167,7 +176,7 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
             else:
                 nan_count += 1
         if 1 <= nan_count < len(params_to_check):
-            print(f"警告: {flag}参数中第{i+1}行数据存在部分参数缺失: {nan_count}个NaN值")
+            print(f"警告: {flag}参数中第{i+1}行数据存在部分参数缺失: {nan_count}个NaN值; 对应case_id: {data['case_id'][i] if 'case_id' in data else 'N/A'}")
             all_checks_passed = False
     if all_checks_passed:
         print(f"{flag}参数中所有行数据均完整或全部缺失，无部分缺失情况。")
@@ -234,6 +243,34 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
                 print(f"    非法取值示例: {np.unique(vals[~np.isin(vals.astype(int), [0,1])])}")
             verification_results['is_driver_side'] = is_driver_ok
             all_checks_passed &= is_driver_ok
+
+    # # 新逻辑关键校验：pulse_source_case_id 映射关系
+    # if 'case_id' in data and 'pulse_source_case_id' in data:
+    #     map_df = pd.DataFrame({
+    #         'case_id': pd.to_numeric(data['case_id'], errors='coerce'),
+    #         'pulse_source_case_id': pd.to_numeric(data['pulse_source_case_id'], errors='coerce')
+    #     })
+
+    #     base_valid = (~map_df['case_id'].isna()) & (~map_df['pulse_source_case_id'].isna())
+    #     is_map_basic_valid = bool(base_valid.all())
+    #     print(f"  - 检查 'case_id/pulse_source_case_id' 非空且可转数值: {'通过' if is_map_basic_valid else '失败!!!!!!!'}")
+    #     verification_results['pulse_source_basic'] = is_map_basic_valid
+    #     all_checks_passed &= is_map_basic_valid
+
+    #     if is_map_basic_valid:
+    #         map_df['case_id'] = map_df['case_id'].astype(np.int64)
+    #         map_df['pulse_source_case_id'] = map_df['pulse_source_case_id'].astype(np.int64)
+
+    #         # 每个 pulse_source_case_id 必须能在当前数据集中找到对应 case_id
+    #         case_set = set(map_df['case_id'].tolist())
+    #         source_exists = map_df['pulse_source_case_id'].isin(case_set)
+    #         is_source_exists_valid = bool(source_exists.all())
+    #         print(f"  - 检查 'pulse_source_case_id' 均能在数据中定位到来源case: {'通过' if is_source_exists_valid else '失败!!!!!!!'}")
+    #         if not is_source_exists_valid:
+    #             bad = map_df.loc[~source_exists, ['case_id', 'pulse_source_case_id']].head(10)
+    #             print(f"    示例异常映射: {bad.to_dict(orient='records')}")
+    #         verification_results['pulse_source_exists'] = is_source_exists_valid
+    #         all_checks_passed &= is_source_exists_valid
 
     # 3. 特殊参数检查
     if flag == 'VCS':
@@ -639,19 +676,27 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
                 # ==================== 在图中标注关键区间比例 ====================
                 if flag == 'MADYMO':
                     if param == 'LL1':
-                        # 标注 [1.5, 3.0] kN 区间比例
+                        # 标注 [1.5, 3.0] kN 区间比例 和 [1.0, 4.5] kN 范围内的样本比例
                         ll1_in_range = np.sum((param_data >= 1.5) & (param_data <= 3.0))
                         ll1_ratio = ll1_in_range / len(param_data) * 100
                         # 绘制关键区间背景
                         axes1[i].axvspan(1.5, 3.0, alpha=0.2, color='red', label=f'[1.5,3.0]kN: {ll1_ratio:.1f}%')
                         axes1[i].legend(loc='upper right', fontsize=8)
+                        ll1_in_range_wide = np.sum((param_data >= 1.0) & (param_data <= 4.5))
+                        ll1_ratio_wide = ll1_in_range_wide / len(param_data) * 100
+                        axes1[i].axvspan(1.0, 4.5, alpha=0.1, color='orange', label=f'[1.0,4.5]kN: {ll1_ratio_wide:.1f}%')
+                        axes1[i].legend(loc='upper right', fontsize=8)
                     
                     elif param == 'LL2':
-                        # 标注 [0.5, 1.5] kN 区间比例
+                        # 标注 [0.5, 1.5] kN 区间比例和 [0.5, 2.7] kN 范围内的样本比例
                         ll2_in_range = np.sum((param_data >= 0.5) & (param_data <= 1.5))
                         ll2_ratio = ll2_in_range / len(param_data) * 100
                         # 绘制关键区间背景
                         axes1[i].axvspan(0.5, 1.5, alpha=0.2, color='red', label=f'[0.5,1.5]kN: {ll2_ratio:.1f}%')
+                        axes1[i].legend(loc='upper right', fontsize=8)
+                        ll2_in_range_wide = np.sum((param_data >= 0.5) & (param_data <= 2.7))
+                        ll2_ratio_wide = ll2_in_range_wide / len(param_data) * 100
+                        axes1[i].axvspan(0.5, 2.7, alpha=0.1, color='orange', label=f'[0.5,2.7]kN: {ll2_ratio_wide:.1f}%')
                         axes1[i].legend(loc='upper right', fontsize=8)
                     
                     elif param == 'LLATTF':
@@ -867,9 +912,9 @@ if __name__ == '__main__':
     
     # MADYMO验证
     verify_and_visualize_params(
-        r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0223.csv',
+        r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0302.csv',
         flag='MADYMO',
-        output_dir='MADYMO_sample_verification_0223_OT3',
+        output_dir='MADYMO_sample_verification_0302',
         param_pairs=[
             ('LL1', 'LL2'),
             ('BTF', 'LLATTF'),

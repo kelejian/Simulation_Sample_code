@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-MADYMO XML 自动化生成脚本 (Step 3 - 20260122 版本)
+MADYMO XML 自动化生成脚本 (Step 3 - 20260302 版本)
 --------------------------------------------------
 功能：
 1. 读取 distribution.csv 参数矩阵。
@@ -23,13 +23,13 @@ from datetime import datetime
 # 格式: '{驾驶侧}_{假人体型}'
 # 可选: 'DS_5th', 'DS_50th', 'DS_95th', 'PS_5th', 'PS_50th', 'PS_95th'
 # =================================*****===================================
-XML_TYPE = 'DS_95th'
+XML_TYPE = 'PS_5th'
 # =================================*****===================================
 # --- 路径配置 ---
 # 请根据实际环境确认以下路径
 BASE_XML_DIR = r'D:\MADYMO_xml文件'
 # =================================*****===================================
-PARAM_FILE_PATH = r'I:\000 LX\dataset0715\03\distribution_0223.csv'
+PARAM_FILE_PATH = r'I:\000 LX\dataset0715\03\distribution_0302.csv'
 # =================================*****===================================
 PULSE_FILES_DIR = r'I:\000 LX\dataset0715\03\acc_data_before1111_6134'
 OUTPUT_DIR = os.path.join(BASE_XML_DIR, XML_TYPE)
@@ -41,16 +41,15 @@ SUMMARY_CSV_MODE = 'batch'  # future: 'append' supported if needed
 # --- Base XML 文件映射 ---
 # =================================*****===================================
 BASE_XML_PATHS = {
-    'DS_5th':  os.path.join(BASE_XML_DIR, '主驾-5th假人-base-V4-0207.xml'),
+    'DS_5th':  os.path.join(BASE_XML_DIR, '主驾-5th假人-base-V6-0225.xml'),
     'DS_50th': os.path.join(BASE_XML_DIR, '主驾-50th假人-base-V5-0121.xml'),
-    'DS_95th': os.path.join(BASE_XML_DIR, '主驾-95th假人-base-1220.xml'),
+    'DS_95th': os.path.join(BASE_XML_DIR, '主驾-95th假人-base-V6-0225.xml'),
     'PS_5th':  os.path.join(BASE_XML_DIR, '副驾-5th假人-base-0104.xml'),
     'PS_50th': os.path.join(BASE_XML_DIR, '副驾-50th假人-base-1221.xml'),
     'PS_95th': os.path.join(BASE_XML_DIR, '副驾-95th假人-base-1226.xml'),
 }
 # =================================*****===================================
 # --- 常量配置 ---
-NON_DRIVER_OFFSET = 50000  # 副驾工况ID偏移量
 CASE_ID_LIST = None        # 指定特定case_id列表 (None表示处理所有)
 # CASE_ID_LIST = [2, 50001, 50004, 50005] # 调试用
 
@@ -226,89 +225,150 @@ def calc_joint_angles(ot, is_driver, Seat_X_Disp, Seat_Z_Disp, Seat_Back_rotatio
                 return hipL, hipR, kneeL, kneeR, AnkleL, AnkleR, shoulder, elbow
 
             elif Seat_Z_Disp > 0.03:
-                # 使用图中第二套拟合式，先做归一化：
-                X0 = 0.135
-                Z0 = 0.045
-                Lx = 0.0122474487
-                Lz = 0.0122474487
-
-                x = (Seat_X_Disp - X0) / Lx
-                z = (Seat_Z_Disp - Z0) / Lz
+                # X=Seat_X_Disp, Z=Seat_Z_Disp, A=Seat_Back_rotation_Angle (rad)
+                # 无量纲化：把范围大致映射到 [-1, 1]
+                x = (Seat_X_Disp - 0.135) / 0.015
+                z = (Seat_Z_Disp - 0.045) / 0.015
                 A = Seat_Back_rotation_Angle
+                a = (A - 0.0673) / 0.0873
                 sinA = np.sin(A)
                 cosA = np.cos(A)
 
-
-                # (1) hipL_angle
                 hipL = (
-                    0.019624
-                    + 0.004101*x + 0.025627*z - 0.028675*x*z + 0.010651*x**2 + 0.003257*z**2
-                    - 0.899436*sinA + 0.024904*cosA
-                    + 0.159715*x*sinA + 0.069264*z*sinA + 0.012206*x*z*sinA + 0.098215*x**2*sinA - 0.159278*z**2*sinA
-                    - 0.025825*x*cosA + 0.001029*z*cosA + 0.041391*x*z*cosA - 0.018068*x**2*cosA + 0.007834*z**2*cosA
+                    -0.01991706545
+                    + (0.02593918565)*z
+                    + (-0.06112241668)*a
+                    + (-4.613893937e-05)*(x**2)
+                    + (0.009909408019)*(z**2)
+                    + (0.004853243092)*(a**2)
+                    + (0.01238168779)*(z*a)
+                    + (-0.006657797283)*sinA
+                    + (-0.01953203253)*cosA
+                    + (0.002921751205)*(z*sinA)
+                    + (0.02729531192)*(z*cosA)
                 )
 
-                # (2) kneeL_angle
                 kneeL = (
-                    0.115138
-                    + 0.002423*x - 0.040681*z + 0.001222*x*z - 0.001202*x**2 + 0.006356*z**2
-                    + 0.174409*sinA - 0.023984*cosA
-                    - 0.268818*x*sinA - 0.186553*z*sinA - 0.139711*x*z*sinA - 0.301926*x**2*sinA + 0.496451*z**2*sinA
-                    + 0.029813*x*cosA - 0.018545*z*cosA - 0.000744*x*z*cosA + 0.010767*x**2*cosA - 0.038366*z**2*cosA
+                    0.03744247518
+                    + (-0.0468954927)*z
+                    + (-0.01233599623)*a
+                    + (0.007902090308)*(x**2)
+                    + (0.02395964305)*(z**2)
+                    + (0.008663217206)*(a**2)
+                    + (-0.03976882437)*(z*a)
+                    + (0.001442627947)*sinA
+                    + (0.03739712737)*cosA
+                    + (-0.006605872921)*(z*sinA)
+                    + (-0.04644677034)*(z*cosA)
                 )
 
-                # (3) AnkleL_angle
                 AnkleL = (
-                    0.209395
-                    - 0.000092*x + 0.017588*z + 0.001284*x*z + 0.003387*x**2 + 0.002504*z**2
-                    - 0.000994*sinA + 0.000060*cosA
-                    + 0.000929*x*sinA + 0.002427*z*sinA + 0.001162*x*z*sinA - 0.000465*x**2*sinA - 0.000628*z**2*sinA
-                    - 0.000171*x*cosA + 0.017402*z*cosA + 0.001189*x*z*cosA + 0.003405*x**2*cosA + 0.002529*z**2*cosA
+                    0.09068266463
+                    + (0.01636727423)*z
+                    + (-0.1003841563)*a
+                    + (0.005452635647)*(x**2)
+                    + (-0.04158453552)*(z**2)
+                    + (-0.0009211460836)*(a**2)
+                    + (0.007041118227)*(z*a)
+                    + (-0.002634022612)*sinA
+                    + (0.09106947069)*cosA
+                    + (0.00171402576)*(z*sinA)
+                    + (0.01630110551)*(z*cosA)
                 )
 
-                # (4) hipR_angle
                 hipR = (
-                    0.063132
-                    - 0.014875*x + 0.020137*z - 0.001674*x*z - 0.003378*x**2 - 0.007852*z**2
-                    - 1.044156*sinA + 0.078394*cosA
-                    - 0.003726*x*sinA + 0.001303*z*sinA - 0.008961*x*z*sinA - 0.038028*x**2*sinA - 0.066238*z**2*sinA
-                    + 0.001753*x*cosA + 0.019331*z*cosA + 0.006752*x*z*cosA + 0.003167*x**2*cosA - 0.003275*z**2*cosA
+                    0.02910819225
+                    + (-0.05600975897)*x
+                    + (-0.003134475853)*z
+                    + (-0.1007329814)*a
+                    + (0.003201656335)*(x**2)
+                    + (-0.01666532209)*(z**2)
+                    + (-5.508989903e-05)*(a**2)
+                    + (0.004196973235)*(x*z)
+                    + (-2.263755205e-05)*(x*a)
+                    + (-0.0009924370478)*(z*a)
+                    + (-0.006805423825)*sinA
+                    + (0.02963314463)*cosA
+                    + (0.002551171854)*(x*sinA)
+                    + (0.003383647811)*(z*sinA)
+                    + (0.03787955817)*(x*cosA)
+                    + (0.05148785825)*(z*cosA)
                 )
 
-                # (5) kneeR_angle
                 kneeR = (
-                    0.016663
-                    + 0.018993*x - 0.027955*z - 0.007955*x*z + 0.000399*x**2 + 0.021462*z**2
-                    + 0.162458*sinA - 0.010638*cosA
-                    + 0.006177*x*sinA - 0.027036*z*sinA + 0.011753*x*z*sinA + 0.112348*x**2*sinA + 0.095494*z**2*sinA
-                    + 0.016682*x*cosA - 0.026300*z*cosA - 0.009244*x*z*cosA - 0.005929*x**2*cosA + 0.015234*z**2*cosA
+                    0.02601430851
+                    + (0.3217359568)*x
+                    + (0.05400333035)*z
+                    + (0.04035963954)*a
+                    + (-0.01466694492)*(x**2)
+                    + (0.04416623753)*(z**2)
+                    + (-0.001233949883)*(a**2)
+                    + (-0.01827078537)*(x*z)
+                    + (-0.0005885848577)*(x*a)
+                    + (-0.00148867129)*(z*a)
+                    + (0.00526071432)*sinA
+                    + (0.02572346134)*cosA
+                    + (-0.01839343096)*(x*sinA)
+                    + (-0.007849379154)*(z*sinA)
+                    + (-0.2721292105)*(x*cosA)
+                    + (-0.1145264614)*(z*cosA)
                 )
 
-                # (6) AnkleR_angle
                 AnkleR = (
-                    0.055563
-                    - 0.028833*x - 0.008688*z - 0.004997*x*z + 0.001795*x**2 + 0.012825*z**2
-                    - 0.086284*sinA + 0.005630*cosA
-                    + 0.008231*x*sinA - 0.019149*z*sinA + 0.007959*x*z*sinA - 0.055109*x**2*sinA - 0.072948*z**2*sinA
-                    - 0.029278*x*cosA - 0.006559*z*cosA - 0.005530*x*z*cosA + 0.005609*x**2*cosA + 0.017353*z**2*cosA
+                    0.03123648952
+                    + (-0.03375536582)*x
+                    + (-0.008647576774)*z
+                    + (-0.0259724087)*a
+                    + (0.004922459341)*(x**2)
+                    + (0.02770747718)*(z**2)
+                    + (0.0009116757959)*(a**2)
+                    + (-0.01082585496)*(x*z)
+                    + (0.001889666346)*(x*a)
+                    + (-0.001642927586)*(z*a)
+                    + (-0.0001589902212)*sinA
+                    + (0.03131459931)*cosA
+                    + (-0.002100030653)*(x*sinA)
+                    + (-0.0007173785596)*(z*sinA)
+                    + (-0.03360686467)*(x*cosA)
+                    + (-0.008513246749)*(z*cosA)
                 )
 
-                # (7) shoulder_angle
                 shoulder = (
-                    -0.685468
-                    + 0.083958*x + 0.111727*z + 0.136837*x*z + 0.091186*x**2 + 0.033226*z**2
-                    + 1.068753*sinA - 0.179668*cosA
-                    + 0.150157*x*sinA + 0.031116*z*sinA + 0.038109*x*z*sinA + 0.135667*x**2*sinA + 0.044090*z**2*sinA
-                    - 0.076255*x*cosA - 0.114367*z*cosA - 0.140070*x*z*cosA - 0.085891*x**2*cosA - 0.043803*z**2*cosA
+                    -0.3952390938
+                    + (0.009193961452)*x
+                    + (0.001428946862)*z
+                    + (0.1067668728)*a
+                    + (0.01316775698)*(x**2)
+                    + (-0.000576327751)*(z**2)
+                    + (-0.002050197538)*(a**2)
+                    + (-0.007869362243)*(x*z)
+                    + (0.008703500911)*(x*a)
+                    + (0.00982118854)*(z*a)
+                    + (-0.01729115124)*sinA
+                    + (-0.3949625824)*cosA
+                    + (0.001361573794)*(x*sinA)
+                    + (0.0008697086685)*(z*sinA)
+                    + (0.008916693986)*(x*cosA)
+                    + (0.0001700945729)*(z*cosA)
                 )
 
-                # (8) elbow_angle
                 elbow = (
-                    -1.087156
-                    + 0.132255*x - 0.482527*z - 0.410727*x*z - 0.377567*x**2 - 0.148300*z**2
-                    - 3.434315*sinA + 0.395331*cosA
-                    - 0.246067*x*sinA - 0.120419*z*sinA + 0.122573*x*z*sinA - 0.123766*x**2*sinA - 0.137351*z**2*sinA
-                    - 0.180121*x*cosA + 0.527162*z*cosA + 0.401660*x*z*cosA + 0.361690*x**2*cosA + 0.160138*z**2*cosA
+                    -0.44319821
+                    + (-0.02708214276)*x
+                    + (0.01429528143)*z
+                    + (-0.3206224287)*a
+                    + (-0.06415023316)*(x**2)
+                    + (-0.01239120881)*(z**2)
+                    + (0.0008869934282)*(a**2)
+                    + (0.00296014373)*(x*z)
+                    + (-0.02033895738)*(x*a)
+                    + (-0.02477991171)*(z*a)
+                    + (-0.05769646978)*sinA
+                    + (-0.4403183344)*cosA
+                    + (-0.004534417337)*(x*sinA)
+                    + (-0.000535816287)*(z*sinA)
+                    + (-0.04090480757)*(x*cosA)
+                    + (0.02417777455)*(z*cosA)
                 )
 
             return hipL, hipR, kneeL, kneeR, AnkleL, AnkleR, shoulder, elbow
@@ -402,11 +462,11 @@ def calc_joint_angles(ot, is_driver, Seat_X_Disp, Seat_Z_Disp, Seat_Back_rotatio
             return hipL, hipR, kneeL, kneeR, AnkleL, AnkleR, shoulder, elbow
 
 
-def get_pulse_data_string(pulse_dir, driver_case_id, axis):
+def get_pulse_data_string(pulse_dir, pulse_case_id, axis):
     """
     读取CSV波形并格式化为 MADYMO XY_PAIR 字符串
     """
-    csv_path = os.path.join(pulse_dir, f'{axis}{driver_case_id}.csv')
+    csv_path = os.path.join(pulse_dir, f'{axis}{pulse_case_id}.csv')
     if not os.path.exists(csv_path):
         raise FileNotFoundError(f"波形文件未找到: {csv_path}")
 
@@ -522,13 +582,18 @@ def process_single_case(base_tree, case_data, case_id, is_driver, ot):
         raise ValueError(f"  [Error] Case {case_id}: Base XML 中未找到变量 Seat_X_Disp")
 
     # 处理 Seat_Z_Disp = base value + SH采样值
-    sz_nodes = root.xpath(".//DEFINE[@VAR_NAME='Seat_Z_Disp']")
-    if sz_nodes:
-        base_sz_val = float(sz_nodes[0].attrib['VALUE'])
-        Seat_Z_Disp = base_sz_val + val_sh_m # 座椅高度, 单位: m
-        sz_nodes[0].attrib['VALUE'] = f"{Seat_Z_Disp:.6f}"
+    # 只有主驾（is_driver==1）会用到高度参数
+    if is_driver == 1:
+        sz_nodes = root.xpath(".//DEFINE[@VAR_NAME='Seat_Z_Disp']")
+        if sz_nodes:
+            base_sz_val = float(sz_nodes[0].attrib['VALUE'])
+            Seat_Z_Disp = base_sz_val + val_sh_m # 座椅高度, 单位: m
+            sz_nodes[0].attrib['VALUE'] = f"{Seat_Z_Disp:.6f}"
+        else:
+            raise ValueError(f"  [Error] Case {case_id}: Base XML 中未找到变量 Seat_Z_Disp")
     else:
-        raise ValueError(f"  [Error] Case {case_id}: Base XML 中未找到变量 Seat_Z_Disp")
+        # 非司机侧不使用高度，赋0作为占位
+        Seat_Z_Disp = 0.0
 
     # Seat_Back_rotation_Angle = base value - deg2rad[RA采样值 - 25°]
     ra_nodes = root.xpath(".//DEFINE[@VAR_NAME='Seat_Back_rotation_Angle']")
@@ -538,8 +603,9 @@ def process_single_case(base_tree, case_data, case_id, is_driver, ot):
         ra_nodes[0].attrib['VALUE'] = f"{Seat_Back_rotation_Angle:.6f}"
     else:
         raise ValueError(f"  [Error] Case {case_id}: Base XML 中未找到变量 Seat_Back_rotation_Angle")
-        
+    
     # 三个关节角度计算（基于更新后的 Seat_X_Disp, Seat_Z_Disp, Seat_Back_rotation_Angle）
+    # 目前副驾时 Seat_Z_Disp 的值不会参与计算
     joint_angles = calc_joint_angles(ot, is_driver, Seat_X_Disp, Seat_Z_Disp, Seat_Back_rotation_Angle)
     
     # 根据驾驶侧解包角度值
@@ -593,9 +659,14 @@ def process_single_case(base_tree, case_data, case_id, is_driver, ot):
     # --- 3. 修改碰撞波形 ---
     # 规则：直接通过 NAME 属性精确查找 FUNCTION.XY 节点
     
-    # 波形文件的命名使用的是主驾 ID
-    driver_case_id = case_id if is_driver else (case_id - NON_DRIVER_OFFSET)
-    
+    # 波形文件来源由 pulse_source_case_id 显式指定
+    if 'pulse_source_case_id' not in case_data:
+        raise ValueError(f"  [Error] Case {case_id}: 缺少必要列 pulse_source_case_id")
+    try:
+        pulse_case_id = int(case_data['pulse_source_case_id'])
+    except Exception as e:
+        raise ValueError(f"  [Error] Case {case_id}: pulse_source_case_id 非法 ({case_data['pulse_source_case_id']})") from e
+
     pulse_configs = [
         {'axis': 'x', 'exact_name': 'X_lin_pulse_fun'},
         {'axis': 'y', 'exact_name': 'Y_lin_pulse_fun'}
@@ -604,7 +675,7 @@ def process_single_case(base_tree, case_data, case_id, is_driver, ot):
     for p_conf in pulse_configs:
         try:
             # 读取并格式化波形数据
-            pulse_str = get_pulse_data_string(PULSE_FILES_DIR, driver_case_id, p_conf['axis'])
+            pulse_str = get_pulse_data_string(PULSE_FILES_DIR, pulse_case_id, p_conf['axis'])
             
             # 定位节点: <FUNCTION.XY NAME="...">
             # 使用 local-name() 处理可能的命名空间问题，并精确匹配 NAME 属性
@@ -644,6 +715,7 @@ def generate_xml_files():
     if not os.path.exists(base_xml_path):
         print(f"[Fatal] Base XML 文件不存在: {base_xml_path}")
         return
+    print(f"使用 Base XML 模板: {base_xml_path}")
 
     # 2. 读取参数矩阵
     print(f"正在读取参数文件: {PARAM_FILE_PATH}")
@@ -657,9 +729,14 @@ def generate_xml_files():
     if 'case_id' in df.columns:
         df.set_index('case_id', inplace=True)
 
+    required_cols = ['pulse_source_case_id', 'is_driver_side', 'OT', 'is_pulse_ok', 'is_injury_ok']
+    missing_cols = [c for c in required_cols if c not in df.columns]
+    if missing_cols:
+        raise ValueError(f"参数文件缺少必要列: {missing_cols}")
+
     # ------------ summary-CSV 初始化 (严格列顺序，仅记录成功生成的 XML) ------------
     # first: case_id; next guaranteed-from-distribution: impact_velocity, impact_angle, overlap
-    summary_distribution_cols = ['impact_velocity','impact_angle','overlap','LL1','LL2','BTF','LLATTF','PTF','AFT','SP','SH','RA','DZ','is_driver_side','OT']
+    summary_distribution_cols = ['impact_velocity','impact_angle','overlap','LL1','LL2','BTF','LLATTF','PTF','AFT','SP','SH','RA','DZ','is_driver_side','OT','pulse_source_case_id']
     summary_varname_cols = ['Seat_X_Disp','Seat_Z_Disp','Seat_Back_rotation_Angle','R_LL1F','R_LL2F','RPTTF_def','APTTF_def','R_LL2TF','Dring_pos','DAB_TTF','PAB_TTF','hip_angle','knee_angle','ankle_angle','hipL_angle','hipR_angle','kneeL_angle','kneeR_angle','AnkleL_angle','AnkleR_angle','shoulder_angle','elbow_angle']
     summary_columns = ['case_id'] + summary_distribution_cols + summary_varname_cols
     summary_rows = []
@@ -672,16 +749,16 @@ def generate_xml_files():
     # (3) Pulse OK
     # (4) Injury Not OK (只跑还没跑过的或失败的)
     
-    # 获取波形目录下的所有主驾 ID
-    valid_driver_ids = []
+    # 获取波形数据目录下的所有的波形case_id
+    valid_pulse_ids = []
     if os.path.exists(PULSE_FILES_DIR):
         for f in os.listdir(PULSE_FILES_DIR):
             if f.startswith('x') and f.endswith('.csv'):
                 try:
-                    valid_driver_ids.append(int(f[1:-4]))
+                    valid_pulse_ids.append(int(f[1:-4]))
                 except:
                     pass
-    valid_driver_ids = set(valid_driver_ids)
+    valid_pulse_ids = set(valid_pulse_ids)
 
     # 构造待处理列表
     tasks = []
@@ -692,16 +769,15 @@ def generate_xml_files():
 
         row = df.loc[cid]
         
-        # 检查是否为主副驾
-        # 优先读取 'is_driver_side'，如果没有则根据 ID 判断: 主驾 <=50000, 副驾 >50000
-        current_is_driver = row.get('is_driver_side', cid <= 50000)
+        # 检查是否为主副驾（严格要求来自列值）
+        current_is_driver = int(row['is_driver_side'])
         
         # 匹配配置的驾驶侧
         if current_is_driver != is_driver_side:
             continue
             
-        # 匹配假人 OT
-        row_ot = row.get('OT', row.get('occupant_type'))
+        # 匹配假人 OT（严格要求来自 OT 列）
+        row_ot = row['OT']
         if row_ot != ot:
             continue
             
@@ -709,14 +785,17 @@ def generate_xml_files():
         if row.get('is_pulse_ok') != True:
             continue
             
-        # 检查波形文件是否存在
-        driver_id = cid if is_driver_side else (cid - NON_DRIVER_OFFSET)
-        if driver_id not in valid_driver_ids:
+        # 检查波形文件是否存在（严格由 pulse_source_case_id 指定）
+        pulse_case_id = int(row['pulse_source_case_id'])
+        if pulse_case_id not in valid_pulse_ids:
             continue
 
         ###################################################################
         # is_injury_ok为true或false都不处理
         if row.get('is_injury_ok') == True or row.get('is_injury_ok') == False:
+            continue
+        # 仅处理caseid>70000的工况
+        if cid <= 70000:
             continue
         ###################################################################
 
@@ -751,7 +830,9 @@ def generate_xml_files():
 
                 # --- 记录 summary 行（仅在成功写入后） ---
                 try:
-                    parsed_out = etree.parse(out_path)
+                    # reuse the tree we just modified instead of reparsing the written file,
+                    # avoids lxml 'huge input lookup' errors when XML contains large CDATA.
+                    parsed_out = new_tree
 
                     def _get_define(name):
                         nodes = parsed_out.xpath(f".//DEFINE[@VAR_NAME='{name}']")
