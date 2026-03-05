@@ -807,18 +807,12 @@ plt.rcParams['font.sans-serif'] = ['SimHei']
 plt.rcParams['axes.unicode_minus'] = False
 
 # 1.1) distribution 文件路径
-DISTRIBUTION_FILE = r"E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_1224.csv" 
+DISTRIBUTION_FILE = r"E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0311.csv" 
 # 1.2) 图表保存目录
-OUTPUT_DIR = r"E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\代码\injury_distribution_plots"
+OUTPUT_DIR = r"E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\代码\injury_distribution_plots_DSALL"
 if not os.path.exists(OUTPUT_DIR):
     os.makedirs(OUTPUT_DIR)
 
-# 1.3) 用于查找阈值的参数
-THRESHOLDS_PROB = {
-    'HIC': 0.15,  #
-    'Dmax': 0.20, #
-    'Nij': 0.17   #
-}
 # --- 结束配置 ---
 
 def load_and_filter_data(file_path):
@@ -857,12 +851,11 @@ def load_and_filter_data(file_path):
         (distribution_df['is_pulse_ok'] == True) & 
         (distribution_df['is_injury_ok'] == True)
     ].copy() # 使用 .copy() 避免 SettingWithCopyWarning
-    
-    # 进一步筛选50th
-    if 'occupant_type' in filtered_df.columns:
-        filtered_df = filtered_df[filtered_df['occupant_type'] == 2]
-    elif 'OT' in filtered_df.columns:
-        filtered_df = filtered_df[filtered_df['OT'] == 2]
+
+    # # 限定OT取值
+    # filtered_df = filtered_df[filtered_df['OT'].isin([2, 3])]
+    # 限定主驾
+    filtered_df = filtered_df[filtered_df['is_driver_side'] == 1]
 
     print(f"数据加载完成。总行数: {len(distribution_df)}, 筛选后行数: {len(filtered_df)}")
     
@@ -899,9 +892,17 @@ def find_ais_thresholds(calc_function, max_val, step=0.1):
             
     return thresholds
 
-def plot_injury_distribution(data_series, title, xlabel, thresholds, output_path):
+def plot_injury_distribution(data_series, title, xlabel, thresholds, output_path, ot=None):
     """
     绘制单个损伤指标的概率密度直方图、KDE、统计数据和 AIS 阈值。
+
+    Parameters:
+        data_series: pd.Series 要绘制的数据
+        title: str 图表标题
+        xlabel: str x轴标签
+        thresholds: dict AIS等级对应的阈值（可能按OT分组）
+        output_path: str 保存路径
+        ot: pd.Series or np.ndarray (optional) 如果指标是Dmax，则提供每个样本的OT值
     """
     print(f"正在绘制: {title}")
     
@@ -929,11 +930,15 @@ def plot_injury_distribution(data_series, title, xlabel, thresholds, output_path
     
     # 计算各AIS等级的样本数量
     if is_hic:
-        ais_levels = AIS_cal_head(data_series.values, threshold=THRESHOLDS_PROB['HIC'])
+        ais_levels = AIS_cal_head(data_series.values)
     elif is_dmax:
-        ais_levels = AIS_cal_chest(data_series.values, threshold=THRESHOLDS_PROB['Dmax'])
+        if ot is None:
+            # 如果没有提供OT，则假设全部为50th男性 (OT=2)
+            ais_levels = AIS_cal_chest(data_series.values, np.full(len(data_series), 2, dtype=int))
+        else:
+            ais_levels = AIS_cal_chest(data_series.values, ot.values if hasattr(ot, 'values') else ot)
     elif is_nij:
-        ais_levels = AIS_cal_neck(data_series.values, threshold=THRESHOLDS_PROB['Nij'])
+        ais_levels = AIS_cal_neck(data_series.values)
     else:
         ais_levels = None
     
@@ -978,8 +983,10 @@ def plot_injury_distribution(data_series, title, xlabel, thresholds, output_path
         _, y_max_plot = ax.get_ylim()
         
         colors = ['gray', 'green', 'orange', 'red', 'darkred', 'purple']
-                
-        for i, (level, value) in enumerate(thresholds.items()):
+
+        # 阈值直接使用 (已经按 OT 或全体筛选好了)
+        plot_thresholds = thresholds
+        for i, (level, value) in enumerate(plot_thresholds.items()):
             if value > data_series.max():
                 continue
                 
@@ -1023,23 +1030,33 @@ if __name__ == "__main__":
         # 2. 动态查找 AIS 阈值
         print("\n正在查找 AIS 阈值...")
         hic_thresholds = find_ais_thresholds(
-            lambda x: AIS_cal_head(x, threshold=THRESHOLDS_PROB['HIC']), 
+            lambda x: AIS_cal_head(x), 
             max_val=df['HIC'].max(), 
             step=1
         )
-        dmax_thresholds = find_ais_thresholds(
-            lambda x: AIS_cal_chest(x, threshold=THRESHOLDS_PROB['Dmax']), 
-            max_val=df['Dmax'].max(), 
+        # AIS_chest 根据 OT 变化，分别计算三种 OT 的阈值
+        dmax_thresholds_per_ot = {}
+        for ot_val, sub in df.groupby('OT'):
+            dmax_thresholds_per_ot[int(ot_val)] = find_ais_thresholds(
+                lambda x, otv=int(ot_val): AIS_cal_chest(x, np.full_like(x, otv, dtype=int)),
+                max_val=sub['Dmax'].max(),
+                step=0.1
+            )
+        # 全体数据的阈值（采用默认OT=2）
+        dmax_thresholds_all = find_ais_thresholds(
+            lambda x: AIS_cal_chest(x, np.full(len(x), 2, dtype=int)),
+            max_val=df['Dmax'].max(),
             step=0.1
         )
         nij_thresholds = find_ais_thresholds(
-            lambda x: AIS_cal_neck(x, threshold=THRESHOLDS_PROB['Nij']), 
+            lambda x: AIS_cal_neck(x), 
             max_val=df['Nij'].max(), 
             step=0.01
         )
         
         print(f"  HIC 阈值: {hic_thresholds}")
-        print(f"  Dmax 阈值: {dmax_thresholds}")
+        print(f"  Dmax 阈值 per OT: {dmax_thresholds_per_ot}")
+        print(f"  Dmax 全体阈值: {dmax_thresholds_all}")
         print(f"  Nij 阈值: {nij_thresholds}")
         
         # 3. 绘制并保存图表
@@ -1052,13 +1069,28 @@ if __name__ == "__main__":
             hic_thresholds,
             os.path.join(OUTPUT_DIR, "distribution_HIC.png")
         )     
+        # 分OT绘制 Dmax
+        if 'OT' in df.columns:
+            for ot_val in sorted(dmax_thresholds_per_ot.keys()):
+                subset = df[df['OT'] == ot_val]
+                plot_injury_distribution(
+                    subset['Dmax'],
+                    f"胸部损伤 (Dmax) OT={ot_val}",
+                    "Dmax (mm)",
+                    dmax_thresholds_per_ot[ot_val],
+                    os.path.join(OUTPUT_DIR, f"distribution_Dmax_OT{ot_val}.png"),
+                    ot=subset['OT']
+                )
+        # 全体 Dmax
         plot_injury_distribution(
             df['Dmax'],
-            "胸部损伤 (Dmax)",
+            "胸部损伤 (Dmax) 全体",
             "Dmax (mm)",
-            dmax_thresholds,
-            os.path.join(OUTPUT_DIR, "distribution_Dmax.png")
-        )    
+            dmax_thresholds_all,
+            os.path.join(OUTPUT_DIR, "distribution_Dmax_all.png"),
+            ot=None
+        )
+        
         plot_injury_distribution(
             df['Nij'],
             "颈部损伤 (Nij)",
