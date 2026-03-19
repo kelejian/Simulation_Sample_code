@@ -7,7 +7,7 @@ import seaborn as sns
 import shutil
 
 def sample_collision_params(n_samples=6000, skip_points=1024, method='uniform', 
-                            filename='distribution.npz', case_ids=None, seed=20252025):
+                            filename='distribution.csv', case_ids=None, seed=20252025):
     """
     对碰撞工况参数进行采样
     
@@ -230,7 +230,7 @@ def sample_collision_params(n_samples=6000, skip_points=1024, method='uniform',
     
     return filename
 
-sample_collision_params(n_samples=7000, skip_points=5048, method='non_uniform', filename=r'E:\课题组相关\理想项目\仿真数据库相关\distribution\distribution_test1.csv', seed=20250923, case_ids=np.arange(3001, 3001+7000))
+sample_collision_params(n_samples=2000, skip_points=9048, method='non_uniform', filename=r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_OT3.csv', seed=20260103)
 
 # %% 第二部分（20251220版代码）：对约束系统参数进行采样，用于MADYMO乘员损伤仿真
 import numpy as np

@@ -1245,8 +1245,8 @@ elif new_distribution_path.endswith('.csv'):
 # %% 将指定case_id的损伤标签改为False 或 NaN
 import numpy as np
 import pandas as pd
-distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0205.csv'
-new_distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0205_.csv'
+distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0311.csv'
+new_distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0312.csv'
 # 读取distribution文件
 if distribution_path.endswith('.npz'):
     distribution_npz = np.load(distribution_path, allow_pickle=True)
@@ -1260,8 +1260,7 @@ elif distribution_path.endswith('.csv'):
 else:
     raise ValueError("Unsupported distribution file format. Use .csv or .npz")
 # 需要更新的case_id列表
-# case_ids_to_update = [52145, 54284, 53844, 53448, 53641, 56952, 50813, 54254, 57034, 53690, 55617, 51667, 51970, 53044, 54957, 53176, 56323, 54196, 54921, 55707]
-case_ids_to_update = [7865]
+case_ids_to_update = [6139,7625,248,6991,3636,3165,7452,3896,7646,4844] # 主驾20260320剔除
 for case_id in case_ids_to_update:
     if case_id in distribution_df.index:
         distribution_df.at[case_id, 'is_injury_ok'] = False  # nan or False
