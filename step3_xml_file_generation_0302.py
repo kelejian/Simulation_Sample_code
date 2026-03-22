@@ -35,7 +35,7 @@ PULSE_FILES_DIR = r'I:\000 LX\dataset0715\03\acc_data_before1111_6134'
 OUTPUT_DIR = os.path.join(BASE_XML_DIR, XML_TYPE)
 
 # Summary CSV (per-run, timestamped). Only "batch" mode implemented (one file per run).
-SUMMARY_CSV_FILENAME_TEMPLATE = 'xml_generation_summary_{ts}.csv'
+SUMMARY_CSV_FILENAME_TEMPLATE = f'xml_generation_summary_{XML_TYPE}_{{ts}}.csv'
 SUMMARY_CSV_MODE = 'batch'  # future: 'append' supported if needed
 
 # --- Base XML 文件映射 ---
