@@ -23,7 +23,7 @@ from datetime import datetime
 # 格式: '{驾驶侧}_{假人体型}'
 # 可选: 'DS_5th', 'DS_50th', 'DS_95th', 'PS_5th', 'PS_50th', 'PS_95th'
 # =================================*****===================================
-XML_TYPE = 'PS_5th'
+XML_TYPE = 'PS_50th'
 # =================================*****===================================
 # --- 路径配置 ---
 # 请根据实际环境确认以下路径
@@ -41,12 +41,12 @@ SUMMARY_CSV_MODE = 'batch'  # future: 'append' supported if needed
 # --- Base XML 文件映射 ---
 # =================================*****===================================
 BASE_XML_PATHS = {
-    'DS_5th':  os.path.join(BASE_XML_DIR, '主驾-5th假人-base-V6-0225.xml'),
-    'DS_50th': os.path.join(BASE_XML_DIR, '主驾-50th假人-base-V5-0121.xml'),
-    'DS_95th': os.path.join(BASE_XML_DIR, '主驾-95th假人-base-V6-0225.xml'),
-    'PS_5th':  os.path.join(BASE_XML_DIR, '副驾-5th假人-base-0104.xml'),
-    'PS_50th': os.path.join(BASE_XML_DIR, '副驾-50th假人-base-1221.xml'),
-    'PS_95th': os.path.join(BASE_XML_DIR, '副驾-95th假人-base-1226.xml'),
+    'DS_5th':  os.path.join(BASE_XML_DIR, '主驾-5th假人-base-0324.xml'),
+    'DS_50th': os.path.join(BASE_XML_DIR, '主驾-50th假人-base-0324.xml'),
+    'DS_95th': os.path.join(BASE_XML_DIR, '主驾-95th假人-base-0324.xml'),
+    'PS_5th':  os.path.join(BASE_XML_DIR, '副驾-5th假人-base-0324.xml'),
+    'PS_50th': os.path.join(BASE_XML_DIR, '副驾-50th假人-base-0324.xml'),
+    'PS_95th': os.path.join(BASE_XML_DIR, '副驾-95th假人-base-0324.xml'),
 }
 # =================================*****===================================
 # --- 常量配置 ---
@@ -517,6 +517,12 @@ def get_pulse_data_string(pulse_dir, pulse_case_id, axis):
         # 捕获 numpy 解析或其他异常，向上层抛出并附带文件名信息
         raise ValueError(f"读取或处理文件 '{csv_path}' 时出错: {e}")
 
+
+def _format_float_compact(value, precision=8):
+    """将浮点数格式化为紧凑字符串，避免科学计数法。"""
+    s = f"{value:.{precision}f}".rstrip('0').rstrip('.')
+    return s if s else "0"
+
 # ==================== 3. XML 修改核心逻辑 ====================
 
 def process_single_case(base_tree, case_data, case_id, is_driver, ot):
@@ -656,6 +662,31 @@ def process_single_case(base_tree, case_data, case_id, is_driver, ot):
         else:
             print(f"  [Warning] Case {case_id}: Base XML 中未找到变量 {var_name}")
 
+    # --- 2.1 修改 belt_tying_fric_function ---
+    # 规则：仅替换中间两行 XI，分别为 RPTTF_def+0.025 和 RPTTF_def+0.02501。
+    # 第一行和第四行 XI(0/0.15) 及各行 YI(0.1/0.5) 保持不变。
+    try:
+        fric_nodes = root.xpath(".//*[local-name()='FUNCTION.XY'][@NAME='belt_tying_fric_function']")
+        if fric_nodes:
+            fric_table = fric_nodes[0].find("TABLE")
+            if fric_table is not None:
+                xi_mid_1 = _format_float_compact(val_btf_s + 0.025, precision=8)
+                xi_mid_2 = _format_float_compact(val_btf_s + 0.02501, precision=8)
+                fric_str = (
+                    "| XI YI |\n"
+                    "0 0.1\n"
+                    f"{xi_mid_1} 0.1\n"
+                    f"{xi_mid_2} 0.5\n"
+                    "0.15 0.5"
+                )
+                fric_table.text = etree.CDATA(fric_str)
+            else:
+                print(f"  [Warning] Case {case_id}: 找到 belt_tying_fric_function 但未找到 TABLE 节点")
+        else:
+            print(f"  [Warning] Case {case_id}: 未找到 belt_tying_fric_function 节点")
+    except Exception as e:
+        print(f"  [Warning] Case {case_id}: 修改 belt_tying_fric_function 失败 - {e}")
+
     # --- 3. 修改碰撞波形 ---
     # 规则：直接通过 NAME 属性精确查找 FUNCTION.XY 节点
     
@@ -791,12 +822,12 @@ def generate_xml_files():
             continue
 
         ###################################################################
-        # is_injury_ok为true或false都不处理
-        if row.get('is_injury_ok') == True or row.get('is_injury_ok') == False:
-            continue
-        # 仅处理caseid>70000的工况
-        if cid <= 70000:
-            continue
+        # # is_injury_ok为true或false都不处理
+        # if row.get('is_injury_ok') == True or row.get('is_injury_ok') == False:
+        #     continue
+        # # 仅处理caseid>70000的工况
+        # if cid <= 70000:
+        #     continue
         ###################################################################
 
         tasks.append(cid)
