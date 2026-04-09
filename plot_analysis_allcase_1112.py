@@ -172,7 +172,7 @@ def analyze_threshold_exceedance(peak_values, thresholds):
 
 def save_peak_stats_to_csv(peak_stats, file_path):
     """
-    【新增】将峰值统计数据保存为CSV文件。
+    将峰值统计数据保存为CSV文件。
     """
     data_for_df = []
     for direction, p_types in peak_stats.items():
@@ -195,7 +195,7 @@ def save_peak_stats_to_csv(peak_stats, file_path):
 
 def save_threshold_results_to_csv(threshold_results, thresholds, file_path):
     """
-    【新增】将阈值分析结果保存为CSV文件。
+    将阈值分析结果保存为CSV文件。
     """
     data_for_df = []
     for direction, results in threshold_results.items():
@@ -218,7 +218,7 @@ def save_threshold_results_to_csv(threshold_results, thresholds, file_path):
 
 def _generate_query_part(param_name, range_spec):
     """
-    【新增辅助函数】根据范围定义生成pandas查询子字符串。
+    根据范围定义生成pandas查询子字符串。
     
     :param param_name: DataFrame中的列名 (e.g., 'impact_velocity')
     :param range_spec: 范围定义。可以是 None, [min, max], 或 [[min1, max1], [min2, max2]]
@@ -298,7 +298,7 @@ def analyze_and_plot_cases_by_condition(params_df, data_dir, output_root_dir, ve
     threshold_results = analyze_threshold_exceedance(peak_values, thresholds)
     dist_plot_filename = plot_statistical_distributions(peak_values, query_str, analysis_dir)
 
-    # 6. 【新增】保存统计结果到CSV文件
+    # 6. 保存统计结果到CSV文件
     peak_stats_path = os.path.join(analysis_dir, 'peak_statistics.csv')
     save_peak_stats_to_csv(peak_stats, peak_stats_path)
     

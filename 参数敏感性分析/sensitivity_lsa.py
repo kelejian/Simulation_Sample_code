@@ -168,7 +168,7 @@ class SensitivityLSA:
 
 if __name__ == "__main__":
     # 1. 准备全量数据
-    data_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0121.csv'
+    data_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0408_del.csv'
     
     if os.path.exists(data_path):
         loader = DataLoader(data_path)
@@ -180,7 +180,7 @@ if __name__ == "__main__":
         print(f"全量数据构建完成，Shape: {X_full.shape}")
         
         # 2. 初始化 LSA 分析器
-        lsa = SensitivityLSA(model_dir='surrogate-models_opt-results-mae', output_dir='analysis_results_lsa')
+        lsa = SensitivityLSA(model_dir='surrogate-models_opt-results-mae-PS', output_dir='analysis_results_lsa')
         lsa.load_models()
         
         # 3. 定义需要重点分析的参数

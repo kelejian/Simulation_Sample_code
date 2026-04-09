@@ -133,7 +133,7 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
             'LLATTF_vs_BTF',    # LLATTF >= BTF 且 LLATTF <= 150
             'DZ_vs_OT',         # DZ与OT的对应关系
             'SP_vs_OT_side',    # SP与体型和主副驾的关系
-            'SH_vs_OT_side',    # SH（座椅高度）与体型和主副驾的关系（新增）
+            'SH_vs_OT_side',    # SH（座椅高度）与体型和主副驾的关系
             'RA_vs_side',       # RA与主副驾的关系
         ]
         
@@ -499,7 +499,7 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
                 except Exception as _e:
                     print(f"  - 多边形包含检查失败（跳过）: {_e}")
 
-        # -------------------- 新增：SH（座椅高度）按 OT 与主/副驾的分段范围校验 --------------------
+        # -------------------- SH（座椅高度）按 OT 与主/副驾的分段范围校验 --------------------
         if 'SH_vs_OT_side' in special_checks and 'SH' in data and 'OT' in data and 'is_driver_side' in data:
             sh_data = data['SH']
             ot_data = data['OT']
@@ -707,7 +707,7 @@ def verify_and_visualize_params(filepath='distribution.npz', flag='VCS', param_p
                         axes1[i].axvline(x=150, color='red', linestyle='--', linewidth=2, label=f'150ms(不切换): {llattf_150_ratio:.1f}%')
                         axes1[i].legend(loc='upper right', fontsize=8)
 
-                # -------------------- 新增：SP/SH/RA 按主/副驾与按 OT 的分组分布图 --------------------
+                # -------------------- SP/SH/RA 按主/副驾与按 OT 的分组分布图 --------------------
                 if flag == 'MADYMO' and param in ('SP', 'SH', 'RA'):
                     try:
                         df_plot = pd.DataFrame({
@@ -1245,8 +1245,8 @@ elif new_distribution_path.endswith('.csv'):
 # %% 将指定case_id的损伤标签改为False 或 NaN
 import numpy as np
 import pandas as pd
-distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0311.csv'
-new_distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0312.csv'
+distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0408_del.csv'
+new_distribution_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0424_del.csv'
 # 读取distribution文件
 if distribution_path.endswith('.npz'):
     distribution_npz = np.load(distribution_path, allow_pickle=True)
@@ -1260,7 +1260,7 @@ elif distribution_path.endswith('.csv'):
 else:
     raise ValueError("Unsupported distribution file format. Use .csv or .npz")
 # 需要更新的case_id列表
-case_ids_to_update = [6139,7625,248,6991,3636,3165,7452,3896,7646,4844] # 主驾20260320剔除
+case_ids_to_update = [77432,73624,74687,75741,75958]
 for case_id in case_ids_to_update:
     if case_id in distribution_df.index:
         distribution_df.at[case_id, 'is_injury_ok'] = False  # nan or False
@@ -1276,3 +1276,5 @@ if new_distribution_path.endswith('.npz'):
 elif new_distribution_path.endswith('.csv'):
     distribution_df.to_csv(new_distribution_path, index=False)
     print("Updated distribution file with injury labels has been saved.")
+
+# %%

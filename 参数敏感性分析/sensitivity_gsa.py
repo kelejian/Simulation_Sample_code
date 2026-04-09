@@ -147,7 +147,7 @@ class SensitivityGSA:
 
 if __name__ == "__main__":
     # 1. 准备全量数据
-    data_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0121.csv'
+    data_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0408_del.csv'
     
     if os.path.exists(data_path):
         loader = DataLoader(data_path)
@@ -159,7 +159,7 @@ if __name__ == "__main__":
         
         # 2. 运行 GSA 分析
         # 确保 model_dir 与 surrogate_model.py 中保存的路径一致
-        gsa = SensitivityGSA(model_dir='surrogate-models_opt-results-mae', output_dir='analysis_results_gsa')
+        gsa = SensitivityGSA(model_dir='surrogate-models_opt-results-mae-PS', output_dir='analysis_results_gsa')
         gsa.load_models()
         
         summary = gsa.run_analysis(X_full)

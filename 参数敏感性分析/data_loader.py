@@ -20,11 +20,10 @@ class DataLoader:
         self.target_names = ['HIC15', 'Dmax', 'Nij']
         
         # 剔除除了特征和标签外的无关列
-        # 除了is_driver_side外，剩余的有效输入特征共11个
         self.drop_columns = [
             'is_driver_side',
             'DZ', 'PTF', # DZ 和 OT 一一对应，冗余; PTF 与 BTF 完全线性相关，冗余
-            'case_id', 'have_run', 'is_pulse_ok', 'is_injury_ok',
+            'case_id', 'pulse_source_case_id','have_run', 'is_pulse_ok', 'is_injury_ok',
             'delta_vx(kph)', 'delta_vy(kph)', 'delta_v(kph)',
         ]
 
@@ -51,6 +50,8 @@ class DataLoader:
             (df['have_run'] == True) & 
             (df['is_pulse_ok'] == True) & 
             (df['is_injury_ok'] == True)
+            & (df['is_driver_side'] == 0) # 暂时只考虑主驾或副驾 is_driver_side == 1/0
+            # & (df['LL1'] <= 4.5) & (df['LL2'] <= 2.7) # 仅保留LL1<=4.5 且 LL2<=2.7 的样本
         ].copy()
         
         print(f"数据过滤完成: {initial_count} -> {len(df)} (剔除无效样本)")
@@ -87,7 +88,7 @@ class DataLoader:
 # --- 单元测试部分 (实际运行时可注释) ---
 if __name__ == "__main__":
     # 替换为你实际的文件路径进行测试
-    data_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0121.csv' 
+    data_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0408_del.csv' 
     try:
         loader = DataLoader(data_path)
         X_tr, X_te, y_tr, y_te = loader.load_data()

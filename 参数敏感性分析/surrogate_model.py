@@ -37,7 +37,7 @@ class SurrogateModel:
         self.db_path = os.path.join(storage_dir, 'optuna_studies.db')
         self.storage_url = f"sqlite:///{self.db_path}"
 
-        # [新增] 定义单调性约束
+        # 定义单调性约束
         # 1: 正相关 (随着特征值增加，目标值增加)
         # 0: 无约束
         # -1: 负相关
@@ -91,7 +91,7 @@ class SurrogateModel:
             'objective': 'reg:squarederror',
             'n_jobs': -1,
             'random_state': 2025,
-            # [新增] 注入单调性约束
+            # 注入单调性约束
             'monotone_constraints': self.monotone_constraints
         }
         
@@ -155,7 +155,7 @@ class SurrogateModel:
             'objective': 'reg:squarederror',
             'n_jobs': -1,
             'random_state': 2025,
-            # [新增] 确保最优参数中包含约束，供后续全量训练使用
+            # 确保最优参数中包含约束，供后续全量训练使用
             'monotone_constraints': self.monotone_constraints
         })
         
@@ -334,11 +334,9 @@ class SurrogateModel:
         return pd.DataFrame(results, index=X.index if hasattr(X, 'index') else None)
 
 if __name__ == "__main__":
-    # --- 全自动流程测试 ---
-    
     # 1. 准备数据
     # 请确保 data_loader.py 在同一目录下，且路径正确
-    data_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0121.csv'
+    data_path = r'E:\WPS Office\1628575652\WPS企业云盘\清华大学\我的企业文档\课题组相关\理想项目\仿真数据库相关\distribution\distribution_0408_del.csv'
     
     if os.path.exists(data_path):
         # 加载数据
